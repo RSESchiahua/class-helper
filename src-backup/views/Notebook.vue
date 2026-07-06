@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 const homeworkOptions = [
   '聯絡簿', '甲本', '乙本', '國習', '數習', '社習',
@@ -22,45 +22,25 @@ const students = computed(() => {
 
 const className = computed(() => localStorage.getItem('className') || '三年○班')
 
-function cleanStudentName(name = '') {
-  return String(name)
-    .replace(/^\s*(?:座號)?\d{1,2}[.、．)）\- ]+/, '')
-    .trim()
-}
-
-function studentNumber(index) {
-  return String(index + 1).padStart(2, '0')
-}
-
-function studentDisplayName(index) {
-  return cleanStudentName(students.value[index]) || `學生${index + 1}`
-}
-
-
-function createBoard(title = '聯絡簿') {
-  return {
-    id: Date.now() + Math.random(),
-    title,
+function createDefaultBoards() {
+  return Array.from({ length: 4 }, (_, index) => ({
+    id: index,
+    title: index === 0 ? '國習' : '聯絡簿',
     customTitle: '',
     subject: '國語',
     round: '',
     statuses: {},
     sparkle: {}
-  }
-}
-
-function createDefaultBoards() {
-  return [createBoard('聯絡簿')]
+  }))
 }
 
 function loadBoards() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
     if (Array.isArray(saved) && saved.length) {
-      return saved.map((board, index) => ({
-        ...createBoard(index === 0 ? '聯絡簿' : '自訂'),
+      return createDefaultBoards().map((board, index) => ({
         ...board,
-        id: board.id ?? Date.now() + index,
+        ...(saved[index] || {}),
         sparkle: {}
       }))
     }
@@ -71,6 +51,7 @@ function loadBoards() {
 }
 
 const boards = reactive(loadBoards())
+const displayCount = ref(4)
 const toast = ref('')
 const reminderText = ref('')
 const isReminderOpen = ref(false)
@@ -80,29 +61,10 @@ const clearConfirm = ref(false)
 const isWeeklyOpen = ref(false)
 const selectedWeeklyStudent = ref(null)
 
-watch([isReminderOpen, isWeeklyOpen, isClearOpen], ([reminderOpen, weeklyOpen, clearOpen]) => {
-  const locked = reminderOpen || weeklyOpen || clearOpen
-  document.body.style.overflow = locked ? 'hidden' : ''
-  document.documentElement.style.overflow = locked ? 'hidden' : ''
-})
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = ''
-  document.documentElement.style.overflow = ''
-})
-
 const weeklyRecords = ref(loadJson(WEEKLY_KEY, []))
 const notifiedMap = ref(loadJson(NOTIFIED_KEY, {}))
 
-const visibleBoards = computed(() => boards)
-
-const notebookGridClass = computed(() => ({
-  single: visibleBoards.value.length === 1,
-  double: visibleBoards.value.length === 2,
-  triple: visibleBoards.value.length === 3,
-  compact: visibleBoards.value.length >= 3
-}))
-
+const visibleBoards = computed(() => boards.slice(0, displayCount.value))
 
 watch(
   boards,
@@ -175,7 +137,8 @@ function getTitle(board) {
 }
 
 function studentLabel(index) {
-  return `${studentNumber(index)} ${studentDisplayName(index)}`
+  const name = students.value[index] || `學生${index + 1}`
+  return `${name}（${String(index + 1).padStart(2, '0')}）`
 }
 
 function todayKey() {
@@ -255,7 +218,7 @@ function addWeeklyRecord(board, index, status) {
     boardId: board.id,
     title,
     studentIndex: index,
-    studentName: studentDisplayName(index),
+    studentName: students.value[index] || '',
     status,
     resolved: false,
     notified: false,
@@ -354,29 +317,6 @@ function boardStats(board) {
   }
 }
 
-
-function addBoard() {
-  boards.push(createBoard('聯絡簿'))
-  showToast(`➕ 已新增第 ${boards.length} 個簿本品項`)
-}
-
-function removeBoard(target = boards[boards.length - 1]) {
-  if (boards.length <= 1) {
-    showToast('至少要保留 1 個簿本品項')
-    return
-  }
-
-  const index = boards.findIndex(board => board.id === target.id)
-  if (index === -1) return
-
-  const title = getTitle(target)
-  const ok = window.confirm(`確定要刪除「${title}」這個品項框格嗎？這會移除目前畫面上的狀態紀錄。`)
-  if (!ok) return
-
-  boards.splice(index, 1)
-  showToast(`➖ 已刪除「${title}」`)
-}
-
 function openClearDialog(board) {
   clearTarget.value = board
   clearConfirm.value = false
@@ -445,13 +385,12 @@ const activeWeeklyRecords = computed(() => {
 
 const weeklySummary = computed(() => {
   return students.value.map((name, index) => {
-    const displayName = studentDisplayName(index)
     const records = activeWeeklyRecords.value.filter(record => record.studentIndex === index)
     const missing = records.filter(record => record.status === 'missing')
     const fix = records.filter(record => record.status === 'fix')
     return {
       index,
-      name: displayName,
+      name,
       label: studentLabel(index),
       missingCount: missing.length,
       fixCount: fix.length,
@@ -531,7 +470,7 @@ function toggleNotified(item) {
 }
 
 function resetWeeklyRecords() {
-  const ok = window.confirm('確定要清除本週簿本通知紀錄嗎？這不會清除目前畫面上的簿本狀態。')
+  const ok = window.confirm('確定要清除本週簿本通知紀錄嗎？這不會清除目前四項簿本狀態。')
   if (!ok) return
   weeklyRecords.value = weeklyRecords.value.filter(record => record.weekStart !== currentWeekStart.value)
   Object.keys(notifiedMap.value).forEach(key => {
@@ -558,9 +497,16 @@ function formatDate(dateText) {
         <button class="weekly-btn" @click="openWeeklyPanel">
           📩 本週通知（{{ studentsNeedNotify.length }}）
         </button>
-        <div class="item-controls" aria-label="簿本品項增減">
-          <span>品項：{{ boards.length }}</span>
-          <button class="add-item-btn" @click="addBoard">＋ 新增品項</button>
+        <div class="display-switch">
+          <span>顯示：</span>
+          <button
+            v-for="count in [1, 2, 4]"
+            :key="count"
+            :class="{ active: displayCount === count }"
+            @click="displayCount = count"
+          >
+            {{ count }}項
+          </button>
         </div>
       </div>
     </div>
@@ -608,12 +554,11 @@ function formatDate(dateText) {
       </aside>
 
       <div class="notebook-main">
-        <div class="notebook-grid" :class="notebookGridClass">
+        <div class="notebook-grid" :class="`view-${displayCount}`">
           <section
             v-for="board in visibleBoards"
             :key="board.id"
             class="notebook-card"
-            :class="{ compact: visibleBoards.length >= 3 }"
           >
             <div class="board-toolbar">
               <select v-model="board.title">
@@ -632,7 +577,7 @@ function formatDate(dateText) {
               >
                 {{ reminderButtonText(board) }}
               </button>
-              <button class="remove-board-btn" @click="removeBoard(board)" :disabled="boards.length <= 1">－ 品項</button>
+              <button class="clear-btn" @click="openClearDialog(board)">🧹 新紀錄</button>
             </div>
 
             <div v-if="board.title === '考卷'" class="exam-row">
@@ -664,8 +609,8 @@ function formatDate(dateText) {
                 @click="toggleStatus(board, index)"
                 :title="`${studentLabel(index)}：${statusText(board.statuses[index])}`"
               >
-                <strong>{{ studentNumber(index) }}</strong>
-                <small>{{ studentDisplayName(index) }}</small>
+                <strong>{{ student }}</strong>
+                <small>{{ String(index + 1).padStart(2, '0') }}</small>
                 <span>{{ statusIcon(board.statuses[index]) }}</span>
                 <em v-if="board.sparkle[index]">✨</em>
               </button>
@@ -679,7 +624,7 @@ function formatDate(dateText) {
       <div class="reminder-modal">
         <div class="modal-header">
           <h3>📋 催繳訊息</h3>
-          <button class="close-btn" @click="isReminderOpen = false">×</button>
+          <button class="close-btn" @click="isReminderOpen = false">✕</button>
         </div>
 
         <pre>{{ reminderText }}</pre>
@@ -692,13 +637,13 @@ function formatDate(dateText) {
     </div>
 
     <div v-if="isWeeklyOpen" class="modal-backdrop" @click.self="isWeeklyOpen = false">
-      <div class="weekly-modal weekly-modal-compact">
+      <div class="weekly-modal">
         <div class="modal-header">
           <div>
             <h3>📩 本週家長通知中心</h3>
             <p>週起始：{{ currentWeekStart }}｜先複製 LINE 訊息，不自動發送。</p>
           </div>
-          <button class="close-btn" @click="isWeeklyOpen = false">×</button>
+          <button class="close-btn" @click="isWeeklyOpen = false">✕</button>
         </div>
 
         <div class="weekly-modal-grid">
@@ -771,7 +716,7 @@ function formatDate(dateText) {
       <div class="reminder-modal clear-modal">
         <div class="modal-header">
           <h3>🧹 開始新的紀錄</h3>
-          <button class="close-btn" @click="closeClearDialog">×</button>
+          <button class="close-btn" @click="closeClearDialog">✕</button>
         </div>
 
         <p class="clear-warning">
@@ -844,7 +789,7 @@ function formatDate(dateText) {
   box-shadow: 0 8px 18px rgba(255, 138, 61, .25);
 }
 
-.item-controls {
+.display-switch {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -853,29 +798,22 @@ function formatDate(dateText) {
   border-radius: 18px;
 }
 
-.item-controls span {
-  font-weight: 900;
-  color: #475569;
+.display-switch span {
+  font-weight: 800;
   white-space: nowrap;
 }
 
-.item-controls button {
+.display-switch button {
+  background: #f4fbf7;
+  color: #2f6f57;
+  border: 2px solid #dff3ea;
   padding: 10px 14px;
   border-radius: 14px;
 }
 
-.add-item-btn {
+.display-switch button.active {
   background: #6bbf95;
-}
-
-.remove-board-btn {
-  background: #e9897e;
-}
-
-.item-controls button:disabled,
-.remove-board-btn:disabled {
-  background: #cbd5e1;
-  cursor: not-allowed;
+  color: white;
 }
 
 .empty-card {
@@ -970,20 +908,17 @@ function formatDate(dateText) {
   gap: 16px;
 }
 
-.notebook-grid.single {
+.notebook-grid.view-1 {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.notebook-grid.double {
-  grid-template-columns: repeat(2, minmax(360px, 1fr));
+.notebook-grid.view-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.notebook-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-}
-
-.notebook-grid.compact.triple {
-  grid-template-columns: repeat(2, minmax(380px, 1fr));
+.notebook-grid.view-4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .notebook-card {
@@ -994,7 +929,7 @@ function formatDate(dateText) {
   min-width: 0;
 }
 
-.notebook-card.compact {
+.view-4 .notebook-card {
   padding: 12px;
   border-radius: 18px;
 }
@@ -1023,18 +958,18 @@ input {
 
 .board-toolbar button {
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
-.notebook-card.compact .board-toolbar {
+.view-4 .board-toolbar {
   gap: 6px;
   margin-bottom: 8px;
 }
 
-.notebook-card.compact .board-toolbar button,
-.notebook-card.compact .board-toolbar select,
-.notebook-card.compact input {
+.view-4 .board-toolbar button,
+.view-4 .board-toolbar select,
+.view-4 input {
   padding: 7px 8px;
   font-size: 13px;
   border-radius: 12px;
@@ -1072,16 +1007,20 @@ input {
 
 .seat-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 9px;
   margin-top: 10px;
 }
 
-.notebook-card.compact .seat-grid {
-  grid-template-columns: repeat(4, minmax(72px, 1fr));
-  gap: 8px;
+.view-1 .seat-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
+.view-4 .seat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
 
 .seat {
   min-height: 78px;
@@ -1096,42 +1035,45 @@ input {
   padding: 6px 4px;
 }
 
+.view-1 .seat {
+  min-height: 86px;
+}
+
+.view-4 .seat {
+  min-height: 58px;
+  border-radius: 12px;
+  padding: 3px;
+}
 
 .seat strong {
   font-size: 18px;
   line-height: 1.1;
-  font-weight: 950;
-}
-
-.seat small {
-  font-size: 15px;
-  opacity: .9;
-  font-weight: 850;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.seat span {
-  font-size: 20px;
-}
-
-.notebook-card.compact .seat {
-  min-height: 70px;
-  padding: 6px 4px;
-}
-
-.notebook-card.compact .seat strong {
-  font-size: 15px;
-}
-
-.notebook-card.compact .seat small {
+.seat small {
   font-size: 12px;
+  opacity: .75;
+  font-weight: 800;
 }
 
-.notebook-card.compact .seat span {
-  font-size: 17px;
+.seat span {
+  font-size: 22px;
+}
+
+.view-4 .seat strong {
+  font-size: 13px;
+}
+
+.view-4 .seat small {
+  font-size: 10px;
+}
+
+.view-4 .seat span {
+  font-size: 15px;
 }
 
 .seat em {
@@ -1169,18 +1111,18 @@ input {
   display: grid;
   place-items: center;
   z-index: 120;
-  padding: 14px;
+  padding: 24px;
 }
 
 .reminder-modal,
 .weekly-modal {
-  width: min(820px, 92vw);
-  max-height: none;
-  overflow: visible;
+  width: min(960px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
   background: linear-gradient(180deg, #fffdf8 0%, #fff7ed 100%);
-  border-radius: 24px;
-  padding: 18px;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, .42);
+  border-radius: 28px;
+  padding: 24px;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, .45);
   border: 4px solid #ffffff;
   outline: 3px solid #f1d9b8;
   color: #1f2937;
@@ -1190,12 +1132,6 @@ input {
   width: min(700px, 92vw);
 }
 
-.weekly-modal {
-  width: min(720px, 88vw);
-  padding: 14px;
-  display: block;
-}
-
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1203,46 +1139,34 @@ input {
   gap: 16px;
   background: #ffffff;
   border: 2px solid #f1d9b8;
-  border-radius: 16px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
+  border-radius: 20px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
   box-shadow: 0 8px 24px rgba(100, 116, 139, .12);
-  flex: 0 0 auto;
 }
 
 .modal-header h3 {
   margin: 0;
   color: #1e293b;
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 950;
 }
 
 .modal-header p {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   color: #475569;
   font-weight: 700;
-  font-size: 14px;
 }
 
 .close-btn {
-  width: 38px;
-  height: 38px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   background: #f1f5f9;
   color: #334155;
   border: 2px solid #d9e2ec;
-  font-size: 24px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 38px;
-  padding: 0;
-  flex: 0 0 38px;
-  appearance: none;
-  -webkit-appearance: none;
-  box-sizing: border-box;
-  text-align: center;
+  font-size: 22px;
+  font-weight: 950;
 }
 
 .reminder-modal pre,
@@ -1251,59 +1175,43 @@ input {
   background: #fffbeb;
   border: 3px dashed #f59e0b;
   border-radius: 20px;
-  padding: 16px;
-  font-size: 16px;
-  line-height: 1.65;
+  padding: 18px;
+  font-size: 17px;
+  line-height: 1.8;
   color: #1f2937;
   font-weight: 750;
 }
 
-.weekly-message-panel pre {
-  min-height: 0;
-  overflow: visible;
-  margin: 6px 0 8px;
-  font-size: 13px;
-  line-height: 1.38;
-  padding: 10px 12px;
-  border-radius: 14px;
-}
-
 .weekly-modal-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  margin-top: 0;
-  align-items: stretch;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 16px;
 }
 
 .student-summary-list {
   background: #ffffff;
   border: 2px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 8px 18px rgba(100,116,139,.10);
-  display: flex;
-  flex-direction: row;
-  gap: 7px;
-  min-height: 0;
+  border-radius: 22px;
+  padding: 14px;
+  max-height: 62vh;
+  overflow: auto;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 10px 24px rgba(100,116,139,.12);
 }
 
 .summary-student {
-  min-width: 128px;
-  flex: 0 0 auto;
+  width: 100%;
   background: #f8fafc;
   color: #334155;
   border: 2px solid #cbd5e1;
-  border-radius: 12px;
+  border-radius: 16px;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 1px 6px;
+  gap: 3px 8px;
   text-align: left;
-  margin-bottom: 0;
-  padding: 6px 8px;
-  font-size: 12px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -1325,12 +1233,9 @@ input {
 .weekly-message-panel {
   background: #ffffff;
   border: 2px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 10px;
-  box-shadow: 0 8px 18px rgba(100, 116, 139, .10);
-  min-height: 0;
-  overflow: visible;
-  display: block;
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(100, 116, 139, .12);
 }
 
 .selected-student-header {
@@ -1342,7 +1247,7 @@ input {
 
 .selected-student-header h4 {
   margin: 0;
-  font-size: 18px;
+  font-size: 26px;
 }
 
 .notified-toggle {
@@ -1358,33 +1263,27 @@ input {
 .detail-columns {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin: 6px 0;
-  flex: 0 0 auto;
+  gap: 12px;
+  margin: 14px 0;
 }
 
 .detail-columns > div {
   background: #f8fafc;
   border: 2px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 8px;
+  border-radius: 18px;
+  padding: 16px;
   color: #1f2937;
 }
 
 .detail-columns h5 {
-  margin: 0 0 4px;
-  font-size: 14px;
-}
-
-.detail-columns p {
-  margin: 0;
+  margin: 0 0 8px;
+  font-size: 17px;
 }
 
 .detail-columns ul {
   margin: 0;
-  padding-left: 16px;
-  line-height: 1.35;
-  font-size: 13px;
+  padding-left: 18px;
+  line-height: 1.8;
 }
 
 .empty-weekly,
@@ -1405,14 +1304,8 @@ input {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
-  flex: 0 0 auto;
-}
-
-.weekly-modal .modal-actions button {
-  padding: 8px 12px;
-  font-size: 13px;
 }
 
 .copy-again-btn {
@@ -1477,31 +1370,6 @@ input {
   cursor: not-allowed;
 }
 
-
-@media (min-width: 1180px) {
-  .notebook-grid.compact:not(.triple) {
-    grid-template-columns: repeat(3, minmax(340px, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .notebook-grid.compact.triple,
-  .notebook-grid.compact {
-    grid-template-columns: 1fr;
-  }
-
-  .weekly-modal {
-    width: min(680px, 92vw);
-  }
-}
-
-@media (max-height: 760px) {
-  .weekly-modal {
-    transform: scale(.92);
-    transform-origin: center center;
-  }
-}
-
 .toast {
   position: fixed;
   right: 28px;
@@ -1510,7 +1378,7 @@ input {
   color: white;
   padding: 18px 24px;
   border-radius: 20px;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   box-shadow: 0 10px 30px rgba(0,0,0,.2);
   z-index: 150;
@@ -1538,12 +1406,13 @@ input {
 }
 
 @media (max-width: 1100px) {
-  .notebook-grid.double,
-  .notebook-grid.compact:not(.triple) {
+  .notebook-grid.view-2,
+  .notebook-grid.view-4 {
     grid-template-columns: 1fr;
   }
 
-  .seat-grid {
+  .seat-grid,
+  .view-1 .seat-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
@@ -1557,10 +1426,9 @@ input {
     justify-content: flex-start;
   }
 
-  .item-controls {
+  .display-switch {
     margin-top: 12px;
     overflow-x: auto;
-    width: 100%;
   }
 
   .weekly-overview {
@@ -1572,383 +1440,14 @@ input {
   }
 
   .seat-grid,
-  .notebook-card.compact .seat-grid {
+  .view-1 .seat-grid,
+  .view-4 .seat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .notebook-grid,
-  .notebook-grid.single,
-  .notebook-grid.double,
-  .notebook-grid.compact {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .weekly-modal {
-    width: min(94vw, 760px);
-    max-height: calc(100vh - 40px);
-    padding: 14px;
   }
 
   .weekly-modal-grid,
   .detail-columns {
     grid-template-columns: 1fr;
   }
-
-  .student-summary-list {
-    max-height: none;
-  }
 }
-
-/* 2026-07-06 refinement: keep weekly notification light and prevent awkward compact-card clipping */
-.modal-backdrop {
-  overflow: hidden !important;
-  align-items: center !important;
-  justify-items: center !important;
-}
-
-.weekly-modal.weekly-modal-compact {
-  width: min(560px, 90vw) !important;
-  max-width: 560px !important;
-  max-height: 86vh !important;
-  overflow: visible !important;
-  padding: 10px !important;
-  border-radius: 18px !important;
-  outline-width: 2px !important;
-  border-width: 3px !important;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, .34) !important;
-}
-
-.weekly-modal-compact .modal-header {
-  padding: 8px 10px !important;
-  margin-bottom: 8px !important;
-  border-radius: 14px !important;
-  gap: 8px !important;
-}
-
-.weekly-modal-compact .modal-header h3 {
-  font-size: 18px !important;
-  line-height: 1.15 !important;
-}
-
-.weekly-modal-compact .modal-header p {
-  font-size: 12px !important;
-  line-height: 1.25 !important;
-  margin-top: 2px !important;
-}
-
-.weekly-modal-compact .close-btn {
-  width: 34px !important;
-  height: 34px !important;
-  flex-basis: 34px !important;
-  font-size: 22px !important;
-  line-height: 1 !important;
-  display: inline-grid !important;
-  place-items: center !important;
-}
-
-.weekly-modal-compact .weekly-modal-grid {
-  gap: 8px !important;
-}
-
-.weekly-modal-compact .student-summary-list {
-  padding: 6px !important;
-  gap: 6px !important;
-  border-radius: 13px !important;
-}
-
-.weekly-modal-compact .summary-student {
-  min-width: 112px !important;
-  padding: 5px 7px !important;
-  border-radius: 10px !important;
-  font-size: 11px !important;
-}
-
-.weekly-modal-compact .weekly-message-panel {
-  padding: 8px !important;
-  border-radius: 13px !important;
-}
-
-.weekly-modal-compact .selected-student-header h4 {
-  font-size: 17px !important;
-}
-
-.weekly-modal-compact .notified-toggle {
-  padding: 8px 10px !important;
-  border-radius: 12px !important;
-  font-size: 13px !important;
-}
-
-.weekly-modal-compact .detail-columns {
-  gap: 6px !important;
-  margin: 6px 0 !important;
-}
-
-.weekly-modal-compact .detail-columns > div {
-  padding: 7px 8px !important;
-  border-radius: 12px !important;
-}
-
-.weekly-modal-compact .detail-columns h5 {
-  font-size: 13px !important;
-  margin-bottom: 3px !important;
-}
-
-.weekly-modal-compact .detail-columns ul,
-.weekly-modal-compact .detail-columns p {
-  font-size: 12px !important;
-  line-height: 1.25 !important;
-}
-
-.weekly-modal-compact .weekly-message-panel pre {
-  margin: 6px 0 8px !important;
-  padding: 10px 12px !important;
-  border-radius: 12px !important;
-  border-width: 2px !important;
-  font-size: 12.5px !important;
-  line-height: 1.42 !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-.weekly-modal-compact .modal-actions {
-  gap: 6px !important;
-}
-
-.weekly-modal-compact .modal-actions button {
-  padding: 7px 10px !important;
-  border-radius: 12px !important;
-  font-size: 12.5px !important;
-}
-
-.notebook-grid.compact.triple {
-  grid-template-columns: repeat(2, minmax(420px, 1fr)) !important;
-  align-items: start !important;
-}
-
-.notebook-card.compact {
-  overflow: visible !important;
-  align-self: start !important;
-}
-
-.notebook-card.compact .seat-grid {
-  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)) !important;
-  gap: 6px !important;
-  align-items: stretch !important;
-}
-
-.notebook-card.compact .seat {
-  min-height: 54px !important;
-  border-radius: 13px !important;
-  padding: 5px 3px !important;
-  grid-template-rows: auto auto auto !important;
-}
-
-.notebook-card.compact .seat strong {
-  font-size: 14px !important;
-  line-height: 1 !important;
-}
-
-.notebook-card.compact .seat small {
-  font-size: 11px !important;
-  line-height: 1.05 !important;
-}
-
-.notebook-card.compact .seat span {
-  font-size: 15px !important;
-  line-height: 1 !important;
-}
-
-@media (max-width: 1100px) {
-  .notebook-grid.compact.triple {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-@media (max-width: 760px) {
-  .weekly-modal.weekly-modal-compact {
-    width: min(94vw, 560px) !important;
-    max-height: 88vh !important;
-    transform: none !important;
-  }
-  .weekly-modal-compact .detail-columns {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-
-/* 2026-07-06 final tightening: compact weekly modal + clean triple-board cards */
-html:has(.modal-backdrop),
-body:has(.modal-backdrop) {
-  overflow: hidden !important;
-}
-
-.weekly-modal.weekly-modal-compact {
-  width: min(720px, 84vw) !important;
-  max-width: 720px !important;
-  max-height: none !important;
-  overflow: visible !important;
-  padding: 10px !important;
-  border-radius: 18px !important;
-  border-width: 2px !important;
-  outline-width: 2px !important;
-}
-
-.weekly-modal-compact .modal-header {
-  padding: 7px 10px !important;
-  margin-bottom: 8px !important;
-  border-radius: 14px !important;
-}
-
-.weekly-modal-compact .modal-header h3 {
-  font-size: 18px !important;
-}
-
-.weekly-modal-compact .modal-header p {
-  font-size: 12px !important;
-}
-
-.weekly-modal-compact .close-btn {
-  width: 32px !important;
-  height: 32px !important;
-  flex: 0 0 32px !important;
-  font-size: 20px !important;
-  line-height: 1 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-}
-
-.weekly-modal-compact .weekly-modal-grid {
-  grid-template-columns: 150px minmax(0, 1fr) !important;
-  gap: 8px !important;
-  align-items: stretch !important;
-}
-
-.weekly-modal-compact .student-summary-list {
-  flex-direction: column !important;
-  overflow: visible !important;
-  padding: 6px !important;
-  gap: 5px !important;
-}
-
-.weekly-modal-compact .summary-student {
-  min-width: 0 !important;
-  width: 100% !important;
-  padding: 5px 7px !important;
-  font-size: 11px !important;
-  border-radius: 10px !important;
-}
-
-.weekly-modal-compact .weekly-message-panel {
-  padding: 8px !important;
-  border-radius: 13px !important;
-}
-
-.weekly-modal-compact .selected-student-header h4 {
-  font-size: 17px !important;
-}
-
-.weekly-modal-compact .notified-toggle {
-  padding: 7px 10px !important;
-  font-size: 12px !important;
-  border-radius: 11px !important;
-}
-
-.weekly-modal-compact .detail-columns {
-  gap: 6px !important;
-  margin: 5px 0 !important;
-}
-
-.weekly-modal-compact .detail-columns > div {
-  padding: 6px 8px !important;
-  border-radius: 11px !important;
-}
-
-.weekly-modal-compact .detail-columns h5 {
-  font-size: 13px !important;
-  margin-bottom: 2px !important;
-}
-
-.weekly-modal-compact .detail-columns ul,
-.weekly-modal-compact .detail-columns p {
-  font-size: 12px !important;
-  line-height: 1.22 !important;
-}
-
-.weekly-modal-compact .weekly-message-panel pre {
-  margin: 5px 0 7px !important;
-  padding: 8px 10px !important;
-  border-width: 2px !important;
-  border-radius: 12px !important;
-  font-size: 12px !important;
-  line-height: 1.32 !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-.weekly-modal-compact .modal-actions {
-  gap: 6px !important;
-}
-
-.weekly-modal-compact .modal-actions button {
-  padding: 7px 10px !important;
-  font-size: 12px !important;
-  border-radius: 11px !important;
-}
-
-.notebook-grid.compact.triple {
-  grid-template-columns: repeat(2, minmax(460px, 1fr)) !important;
-  grid-auto-rows: auto !important;
-  align-items: start !important;
-}
-
-.notebook-grid.compact.triple .notebook-card {
-  align-self: start !important;
-  height: auto !important;
-  min-height: 0 !important;
-  overflow: visible !important;
-}
-
-.notebook-grid.compact.triple .seat-grid {
-  grid-template-columns: repeat(4, minmax(72px, 1fr)) !important;
-  gap: 7px !important;
-  overflow: visible !important;
-}
-
-.notebook-grid.compact.triple .seat {
-  min-height: 58px !important;
-  height: auto !important;
-  padding: 5px 3px !important;
-  border-radius: 12px !important;
-  grid-template-rows: auto auto auto !important;
-}
-
-.notebook-grid.compact.triple .seat strong { font-size: 14px !important; line-height: 1 !important; }
-.notebook-grid.compact.triple .seat small { font-size: 11px !important; line-height: 1.05 !important; }
-.notebook-grid.compact.triple .seat span { font-size: 15px !important; line-height: 1 !important; }
-
-@media (max-width: 1180px) {
-  .notebook-grid.compact.triple {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-@media (max-width: 760px) {
-  .weekly-modal.weekly-modal-compact {
-    width: min(94vw, 560px) !important;
-  }
-  .weekly-modal-compact .weekly-modal-grid,
-  .weekly-modal-compact .detail-columns {
-    grid-template-columns: 1fr !important;
-  }
-  .weekly-modal-compact .student-summary-list {
-    flex-direction: row !important;
-    overflow-x: auto !important;
-  }
-  .weekly-modal-compact .summary-student {
-    min-width: 108px !important;
-  }
-}
-
 </style>

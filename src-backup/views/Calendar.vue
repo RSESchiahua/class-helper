@@ -727,18 +727,4 @@ function removeEvent(index) {
     padding: 1px 5px;
   }
 }
-/* 教室大螢幕修正：週行事曆日期顏色加深，避免淡底看不清楚 */
-.week-day h3,
-.day-number {
-  color: #243b53;
-  font-weight: 900;
-}
-.week-day.sunday h3,
-.day-cell.sunday .day-number { color: #b42318; }
-.week-day.saturday h3,
-.day-cell.saturday .day-number { color: #1d4ed8; }
-.week-day.today h3,
-.day-cell.today .day-number { color: #14532d; }
-.week-day.selected h3 { color: #1f5c47; }
-
 </style>
