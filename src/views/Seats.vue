@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperSeatPlan'
+const POINTS_GROUPS_KEY = 'classHelperSeatGroupsForPoints' // SEATS_POINTS_GROUP_EXPORT_20260707
 const groupColors = ['#dff3ea', '#fff0c2', '#ffd9d2', '#dbeafe', '#eadcff', '#d9f99d']
 
 const students = computed(() => (localStorage.getItem('students') || '').split('\n').map(s => s.trim()).filter(Boolean))
@@ -9,12 +10,53 @@ const plan = ref(loadPlan())
 const selectedGroup = ref(0)
 const selectedSeats = ref(new Set())
 
-watch(plan, value => localStorage.setItem(STORAGE_KEY, JSON.stringify(value)), { deep: true })
+watch(plan, value => saveSeatPlan(value), { deep: true, immediate: true })
 
 const seats = computed(() => plan.value.seats)
 const assignedNames = computed(() => new Set(seats.value.map(seat => seat.student).filter(Boolean)))
 const unassignedStudents = computed(() => students.value.filter(name => !assignedNames.value.has(name)))
 const gridStyle = computed(() => ({ gridTemplateColumns: `repeat(${plan.value.cols}, minmax(72px, 1fr))` }))
+
+
+function buildPointGroups(value = plan.value) {
+  const buckets = new Map()
+
+  for (const seat of value.seats || []) {
+    if (!seat.student || seat.group === null || seat.group === undefined || seat.group === '') continue
+
+    const groupIndex = Number(seat.group)
+    const groupKey = Number.isFinite(groupIndex) ? String(groupIndex) : String(seat.group)
+    const groupName = Number.isFinite(groupIndex) ? `第 ${groupIndex + 1} 組` : String(seat.group)
+
+    if (!buckets.has(groupKey)) {
+      buckets.set(groupKey, {
+        id: `seat-group-${groupKey}`,
+        name: groupName,
+        groupIndex: Number.isFinite(groupIndex) ? groupIndex : null,
+        color: Number.isFinite(groupIndex) ? groupColors[groupIndex] || '' : '',
+        members: []
+      })
+    }
+
+    buckets.get(groupKey).members.push(seat.student)
+  }
+
+  return Array.from(buckets.values())
+    .filter(group => group.members.length > 0)
+    .sort((a, b) => {
+      if (a.groupIndex === null || b.groupIndex === null) return a.name.localeCompare(b.name, 'zh-Hant', { numeric: true })
+      return a.groupIndex - b.groupIndex
+    })
+}
+
+function saveSeatPlan(value = plan.value) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+  localStorage.setItem(POINTS_GROUPS_KEY, JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    source: STORAGE_KEY,
+    groups: buildPointGroups(value)
+  }))
+}
 
 function loadPlan() {
   try {
@@ -68,6 +110,7 @@ function resetPlan() {
 </script>
 
 <template>
+  <!-- SEATS_POINTS_GROUP_EXPORT_20260707 -->
   <div class="page wide-page seats-page">
     <div class="page-title-row">
       <div>

@@ -30,17 +30,19 @@
           </div>
         </div>
 
-        <div class="action-row">
-          <button class="draw-button" type="button" :disabled="isSpinning || wheelItems.length === 0" @click="startDraw">
-            {{ isSpinning ? '抽籤中...' : `▶ 開始抽籤${drawCount > 1 ? ` ${drawCount} 人` : ''}` }}
-          </button>
-          <button class="soft-button" type="button" :disabled="isSpinning" @click="resetWheel">↻ 重設轉盤</button>
-        </div>
+        <div class="wheel-bottom">
+          <div class="action-row">
+            <button class="draw-button" type="button" :disabled="isSpinning || wheelItems.length === 0" @click="startDraw">
+              {{ isSpinning ? '抽籤中...' : `▶ 開始抽籤${drawCount > 1 ? ` ${drawCount} 人` : ''}` }}
+            </button>
+            <button class="soft-button" type="button" :disabled="isSpinning" @click="resetWheel">↻ 重設轉盤</button>
+          </div>
 
-        <div class="result-card" :class="{ show: latestResults.length }">
-          <div class="confetti">🎉 ✨ 🎊</div>
-          <p>抽中囉！</p>
-          <strong>{{ latestResults.length ? latestResults.join('、') : '準備開始' }}</strong>
+          <div class="result-card" :class="{ show: latestResults.length }">
+            <div class="confetti">🎉 ✨ 🎊</div>
+            <p>抽中囉！</p>
+            <strong>{{ latestResults.length ? latestResults.join('、') : '準備開始' }}</strong>
+          </div>
         </div>
       </main>
 
@@ -328,6 +330,7 @@ watch(mode, () => {
 }
 
 .wheel-stage {
+  /* 確認關鍵字：WHEEL_RESET_NO_OVERLAP_20260707 */
   position: relative;
   border-radius: 28px;
   background: rgba(255, 255, 255, .78);
@@ -335,7 +338,9 @@ watch(mode, () => {
   box-shadow: 0 14px 40px rgba(99, 73, 43, .1);
   display: grid;
   place-items: center;
-  padding: 16px;
+  grid-template-rows: 1fr auto;
+  gap: 10px;
+  padding: 16px 20px 18px;
 }
 
 .pointer {
@@ -420,11 +425,23 @@ watch(mode, () => {
 
 .star { font-size: 54px; line-height: 1; }
 
+.wheel-bottom {
+  width: min(100%, 650px);
+  display: grid;
+  grid-template-columns: minmax(350px, auto) minmax(190px, 240px);
+  gap: 14px;
+  align-items: stretch;
+  justify-content: center;
+}
+
 .action-row {
+  position: relative;
+  z-index: 3;
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-top: 8px;
+  justify-content: center;
+  margin-top: 0;
 }
 
 .draw-button {
@@ -440,23 +457,31 @@ watch(mode, () => {
 .draw-button:disabled { opacity: .6; cursor: not-allowed; }
 
 .result-card {
-  position: absolute;
-  right: 28px;
-  bottom: 28px;
-  width: 260px;
-  border-radius: 24px;
+  position: static;
+  width: auto;
+  min-height: 92px;
+  border-radius: 22px;
   background: #fff8df;
   border: 2px solid #ffe1a1;
-  padding: 18px;
+  padding: 12px 14px;
   text-align: center;
-  opacity: .35;
+  opacity: .42;
   transform: scale(.98);
   transition: .25s ease;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
 }
 .result-card.show { opacity: 1; transform: scale(1); }
-.result-card p { margin: 6px 0; font-weight: 900; color: #9a6a28; }
-.result-card strong { font-size: 32px; color: #e5842f; }
-.confetti { font-size: 26px; }
+.result-card p { margin: 2px 0; font-weight: 900; color: #9a6a28; }
+.result-card strong {
+  max-width: 210px;
+  font-size: 24px;
+  line-height: 1.15;
+  color: #e5842f;
+  word-break: break-word;
+}
+.confetti { font-size: 22px; line-height: 1; }
 
 .control-panel {
   display: flex;
@@ -563,5 +588,17 @@ li button { border: 0; background: transparent; color: #a98070; font-size: 22px;
   .wheel-page { overflow: auto; height: auto; }
   .wheel-layout { grid-template-columns: 1fr; height: auto; }
   .control-panel { overflow: visible; }
+}
+
+@media (max-width: 760px) {
+  .wheel-bottom {
+    grid-template-columns: 1fr;
+  }
+  .action-row {
+    flex-wrap: wrap;
+  }
+  .result-card strong {
+    max-width: none;
+  }
 }
 </style>
