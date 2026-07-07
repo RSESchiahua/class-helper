@@ -79,10 +79,19 @@ const monthDays = computed(() => {
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
   const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+
+  // 只顯示「有包含本月日期」的週，不再固定塞滿 6 排。
+  // 例如 2026 年 7 月只會顯示 5 排，不會多出最下面整排 8 月。
   const start = new Date(firstDay)
   start.setDate(firstDay.getDate() - firstDay.getDay())
 
-  return Array.from({ length: 42 }, (_, index) => {
+  const end = new Date(lastDay)
+  end.setDate(lastDay.getDate() + (6 - lastDay.getDay()))
+
+  const totalDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1
+
+  return Array.from({ length: totalDays }, (_, index) => {
     const day = new Date(start)
     day.setDate(start.getDate() + index)
     return createDayInfo(day, month)
@@ -451,11 +460,19 @@ function removeEvent(index) {
   color: #2f6f57;
 }
 
+.calendar-shell.month .calendar-main {
+  min-height: calc(100vh - 170px);
+  display: flex;
+  flex-direction: column;
+}
+
 .month-view {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: 26px repeat(6, 70px);
-  gap: 5px;
+  grid-template-rows: 30px;
+  grid-auto-rows: minmax(96px, 1fr);
+  gap: 8px;
+  flex: 1;
 }
 
 .weekday {
@@ -474,7 +491,8 @@ function removeEvent(index) {
 }
 
 .day-cell {
-  height: 70px;
+  min-height: 96px;
+  height: auto;
   border: 2px solid #edf1f5;
   background: #ffffff;
   color: #1f2937;
@@ -535,7 +553,7 @@ function removeEvent(index) {
 
 .day-number {
   display: block;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 950;
   line-height: 1;
   align-self: flex-start;
@@ -551,7 +569,7 @@ function removeEvent(index) {
 .week-events {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -572,6 +590,19 @@ function removeEvent(index) {
 .more-pill {
   background: #fff1ce;
   color: #b46b00;
+}
+
+.week-view .event-pill {
+  font-size: 15px;
+  line-height: 1.25;
+  padding: 5px 9px;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.week-view .empty-text {
+  font-size: 15px;
+  line-height: 1.4;
 }
 
 .week-view {
@@ -685,8 +716,18 @@ function removeEvent(index) {
     grid-template-columns: 1fr;
   }
 
+  .calendar-shell.month .calendar-main {
+    min-height: calc(100vh - 185px);
+  }
+
   .month-view {
-    grid-template-rows: 26px repeat(6, 66px);
+    grid-template-rows: 28px;
+    grid-auto-rows: minmax(82px, 1fr);
+    gap: 6px;
+  }
+
+  .day-cell {
+    min-height: 82px;
   }
 }
 
@@ -711,13 +752,19 @@ function removeEvent(index) {
     font-size: 20px;
   }
 
+  .calendar-shell.month .calendar-main {
+    min-height: auto;
+  }
+
   .month-view {
-    grid-template-rows: 26px repeat(6, 64px);
+    grid-template-rows: 26px;
+    grid-auto-rows: minmax(64px, auto);
     gap: 4px;
+    flex: initial;
   }
 
   .day-cell {
-    height: 64px;
+    min-height: 64px;
     padding: 5px;
   }
 
@@ -726,7 +773,13 @@ function removeEvent(index) {
     font-size: 10px;
     padding: 1px 5px;
   }
+
+  .week-view .event-pill {
+    font-size: 13px;
+    padding: 4px 7px;
+  }
 }
+
 /* 教室大螢幕修正：週行事曆日期顏色加深，避免淡底看不清楚 */
 .week-day h3,
 .day-number {

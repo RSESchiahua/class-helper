@@ -889,6 +889,11 @@ function formatDate(dateText) {
   align-items: start;
 }
 
+.notebook-main {
+  min-width: 0;
+  overflow: visible;
+}
+
 .weekly-overview {
   display: grid;
   gap: 12px;
@@ -978,12 +983,9 @@ function formatDate(dateText) {
   grid-template-columns: repeat(2, minmax(360px, 1fr));
 }
 
-.notebook-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-}
-
+.notebook-grid.compact,
 .notebook-grid.compact.triple {
-  grid-template-columns: repeat(2, minmax(380px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .notebook-card {
@@ -1478,11 +1480,7 @@ input {
 }
 
 
-@media (min-width: 1180px) {
-  .notebook-grid.compact:not(.triple) {
-    grid-template-columns: repeat(3, minmax(340px, 1fr));
-  }
-}
+/* 品項卡片一列最多兩個，三個以上自動換到下一排，避免右側被切到。 */
 
 @media (max-width: 900px) {
   .notebook-grid.compact.triple,
@@ -1720,8 +1718,9 @@ input {
   font-size: 12.5px !important;
 }
 
+.notebook-grid.compact,
 .notebook-grid.compact.triple {
-  grid-template-columns: repeat(2, minmax(420px, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   align-items: start !important;
 }
 
@@ -1897,21 +1896,25 @@ body:has(.modal-backdrop) {
   border-radius: 11px !important;
 }
 
+.notebook-grid.compact,
 .notebook-grid.compact.triple {
-  grid-template-columns: repeat(2, minmax(460px, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   grid-auto-rows: auto !important;
   align-items: start !important;
 }
 
+.notebook-grid.compact .notebook-card,
 .notebook-grid.compact.triple .notebook-card {
   align-self: start !important;
   height: auto !important;
   min-height: 0 !important;
+  min-width: 0 !important;
   overflow: visible !important;
 }
 
+.notebook-grid.compact .seat-grid,
 .notebook-grid.compact.triple .seat-grid {
-  grid-template-columns: repeat(4, minmax(72px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 7px !important;
   overflow: visible !important;
 }
@@ -1929,6 +1932,7 @@ body:has(.modal-backdrop) {
 .notebook-grid.compact.triple .seat span { font-size: 15px !important; line-height: 1 !important; }
 
 @media (max-width: 1180px) {
+  .notebook-grid.compact,
   .notebook-grid.compact.triple {
     grid-template-columns: 1fr !important;
   }
