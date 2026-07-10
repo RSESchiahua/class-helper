@@ -1157,3 +1157,828 @@ body {
   .calendar-page .week-scroll-area .week-day { min-width: 94px !important; }
   .completion-reward-actions { grid-template-columns: 1fr !important; }
 }
+
+
+/* ✅ HUA_HOME_CONTACT_BOOK_GLOBAL_20260710：首頁聯絡事項的全域手機寬度保護。 */
+.contact-book-card,
+.contact-book-editor,
+.contact-book-display,
+.contact-section {
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .contact-book-card textarea,
+  .home-settings-card,
+  .daily-question {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+
+/* ✅ HUA_HOME_CONTACT_BOOK_VERTICAL_RTL_DATE_STYLE_20260710
+   直式聯絡簿：右頁聯絡簿、左頁每日一句與提問；最右側顯示日期。 */
+.contact-layout-setting {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+.contact-layout-setting > strong { color: #2f6f57; margin-right: 4px; }
+.contact-layout-setting label { margin: 0; }
+
+.vertical-contact-card { padding: 20px; }
+.vertical-book-spread {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: clamp(430px, 58vh, 650px);
+  border: 1px solid #ded5c8;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #fffef9;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+}
+.vertical-book-left,
+.vertical-book-right { min-width: 0; padding: 24px; }
+.vertical-book-left {
+  border-right: 2px solid #d8cfc1;
+  background: linear-gradient(90deg, #fffdf7, #fffaf0);
+}
+.vertical-book-right {
+  background: linear-gradient(90deg, #fffaf0, #fffdf7);
+}
+.vertical-sel-content {
+  height: 100%;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: center;
+  gap: clamp(24px, 4vw, 56px);
+}
+.vertical-sel-block {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  color: #243b53;
+  letter-spacing: .08em;
+  line-height: 1.75;
+}
+.vertical-sel-block strong { font-size: clamp(20px, 2.4vw, 31px); }
+.vertical-sel-block small { font-size: clamp(13px, 1.2vw, 16px); color: #2f6f57; font-weight: 850; }
+.vertical-section-label { color: #4e7c68; font-weight: 950; font-size: 18px; }
+.vertical-question-block { padding-right: 18px; border-right: 1px dashed #d8cfc1; }
+
+.vertical-contact-columns {
+  height: 100%;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: clamp(16px, 2.2vw, 30px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+}
+.vertical-date-column,
+.vertical-contact-item {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  flex: 0 0 auto;
+  color: #243b53;
+  font-weight: 900;
+  line-height: 1.65;
+  letter-spacing: .08em;
+}
+.vertical-date-column {
+  order: -1;
+  padding-left: 14px;
+  border-left: 2px solid #d8cfc1;
+  color: #4e7c68;
+  font-size: clamp(16px, 1.6vw, 21px);
+}
+.vertical-contact-item { font-size: clamp(21px, 2.5vw, 32px); }
+.vertical-contact-index { color: #2f6f57; margin-bottom: 7px; }
+
+@media (max-width: 900px) {
+  .vertical-book-spread { grid-template-columns: 1fr; }
+  .vertical-book-left { border-right: 0; border-bottom: 2px solid #d8cfc1; min-height: 340px; }
+  .vertical-book-right { min-height: 380px; }
+}
+@media (max-width: 760px) {
+  .contact-layout-setting { display: grid; grid-template-columns: 1fr; }
+  .vertical-contact-card { padding: 12px !important; }
+  .vertical-book-left,
+  .vertical-book-right { padding: 14px; }
+  .vertical-book-spread { min-height: 0; }
+  .vertical-sel-content { gap: 18px; justify-content: flex-start; overflow-x: auto; }
+  .vertical-sel-block strong { font-size: 19px; }
+  .vertical-contact-columns { gap: 15px; }
+  .vertical-contact-item { font-size: 21px; }
+  .vertical-date-column { font-size: 15px; }
+}
+
+
+/* ✅ HUA_VERTICAL_BOOK_POLISH_STYLE_20260710
+   直式聯絡簿美感重整：仿實體左右頁、右起閱讀、清楚直書。 */
+.polished-vertical-book {
+  position: relative;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  min-height: clamp(500px, 64vh, 700px);
+  border: 0;
+  border-radius: 28px;
+  background: #fffdf7;
+  box-shadow:
+    0 18px 44px rgba(79, 63, 42, .10),
+    inset 0 0 0 1px rgba(206, 190, 164, .62);
+}
+.polished-vertical-book::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, #cfc2ae 8%, #cfc2ae 92%, transparent);
+  box-shadow: 6px 0 15px rgba(74, 58, 37, .08), -6px 0 15px rgba(74, 58, 37, .05);
+  pointer-events: none;
+}
+.polished-vertical-book .vertical-book-left,
+.polished-vertical-book .vertical-book-right {
+  position: relative;
+  padding: 22px 28px 28px;
+  border: 0;
+  background-color: #fffdf8;
+  background-image:
+    repeating-linear-gradient(
+      to left,
+      transparent 0,
+      transparent 68px,
+      rgba(171, 152, 123, .10) 69px,
+      rgba(171, 152, 123, .10) 70px
+    );
+}
+.polished-vertical-book .vertical-book-left {
+  background-color: #fffaf1;
+}
+.book-page-heading {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  margin: 0 auto 18px;
+  padding: 6px 22px 8px;
+  border-bottom: 2px solid #9ab9aa;
+  color: #2f6f57;
+  font-size: clamp(18px, 1.8vw, 25px);
+  font-weight: 950;
+  letter-spacing: .22em;
+}
+.polished-vertical-book .vertical-sel-content {
+  height: calc(100% - 56px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  direction: rtl;
+  gap: 18px;
+  align-items: start;
+  justify-items: center;
+  overflow: hidden;
+  padding: 8px 10px 0;
+}
+.polished-vertical-book .vertical-sel-block {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  direction: ltr;
+  height: 100%;
+  max-height: 520px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 8px 10px;
+  border: 0;
+  color: #243b53;
+  letter-spacing: .06em;
+  line-height: 1.55;
+}
+.polished-vertical-book .vertical-sel-block strong {
+  font-size: clamp(21px, 2.2vw, 30px);
+  font-weight: 900;
+}
+.polished-vertical-book .vertical-section-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 6px;
+  border-radius: 999px;
+  background: #e9f5ef;
+  color: #2f6f57;
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: .12em;
+}
+.polished-vertical-book .vertical-question-block {
+  padding-right: 20px;
+  border-right: 1px dashed rgba(137, 116, 83, .28);
+}
+.polished-vertical-book .vertical-question-block small {
+  padding: 8px 6px;
+  border-radius: 999px;
+  background: #fff2c7;
+  color: #7a5a16;
+  font-size: 14px;
+  font-weight: 900;
+}
+.polished-vertical-book .vertical-contact-columns {
+  height: calc(100% - 56px);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(68px, auto);
+  direction: rtl;
+  justify-content: start;
+  align-items: start;
+  gap: clamp(16px, 2vw, 28px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 8px 8px;
+  scrollbar-width: thin;
+}
+.polished-vertical-book .vertical-date-column,
+.polished-vertical-book .vertical-contact-item {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  direction: ltr;
+  min-height: 380px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 9px;
+  border-radius: 18px;
+  color: #243b53;
+  font-weight: 900;
+  line-height: 1.55;
+  letter-spacing: .07em;
+}
+.polished-vertical-book .vertical-date-column {
+  min-width: 58px;
+  padding-left: 14px;
+  border-left: 2px solid rgba(114, 146, 128, .35);
+  background: rgba(236, 246, 240, .76);
+  color: #2f6f57;
+  font-size: clamp(15px, 1.4vw, 20px);
+}
+.polished-vertical-book .vertical-contact-item {
+  min-width: 70px;
+  background: rgba(255,255,255,.62);
+  font-size: clamp(22px, 2.2vw, 31px);
+}
+.polished-vertical-book .vertical-contact-index {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #dff3ea;
+  color: #2f6f57;
+  font-size: 18px;
+  font-weight: 950;
+  writing-mode: horizontal-tb;
+  letter-spacing: 0;
+}
+.polished-vertical-book .vertical-contact-text {
+  padding-top: 2px;
+}
+
+@media (max-width: 900px) {
+  .polished-vertical-book {
+    grid-template-columns: 1fr;
+  }
+  .polished-vertical-book::after { display: none; }
+  .polished-vertical-book .vertical-book-left,
+  .polished-vertical-book .vertical-book-right {
+    min-height: 420px;
+  }
+  .polished-vertical-book .vertical-book-left {
+    border-bottom: 2px solid #d8cfc1;
+  }
+}
+
+@media (max-width: 760px) {
+  .polished-vertical-book .vertical-book-left,
+  .polished-vertical-book .vertical-book-right {
+    padding: 16px 12px 18px;
+    min-height: 390px;
+    background-size: auto;
+  }
+  .book-page-heading {
+    margin-bottom: 12px;
+    font-size: 17px;
+  }
+  .polished-vertical-book .vertical-sel-content {
+    gap: 8px;
+    padding-inline: 0;
+  }
+  .polished-vertical-book .vertical-sel-block {
+    max-height: 340px;
+    padding: 4px 5px;
+    gap: 8px;
+  }
+  .polished-vertical-book .vertical-sel-block strong {
+    font-size: 18px;
+  }
+  .polished-vertical-book .vertical-section-label,
+  .polished-vertical-book .vertical-question-block small {
+    font-size: 12px;
+  }
+  .polished-vertical-book .vertical-contact-columns {
+    grid-auto-columns: minmax(58px, auto);
+    gap: 10px;
+    padding-inline: 0;
+  }
+  .polished-vertical-book .vertical-date-column,
+  .polished-vertical-book .vertical-contact-item {
+    min-height: 320px;
+    padding: 6px;
+  }
+  .polished-vertical-book .vertical-contact-item {
+    font-size: 19px;
+  }
+  .polished-vertical-book .vertical-date-column {
+    font-size: 13px;
+  }
+  .polished-vertical-book .vertical-contact-index {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+}
+
+/* ✅ HUA_VERTICAL_BOOK_FIT_ALL_STYLE_20260710
+   直式聯絡簿精修：日期數字並列、左頁依內容縮窄、右頁所有事項免橫向滑動。 */
+.polished-vertical-book {
+  grid-template-columns: minmax(300px, .66fr) minmax(0, 1.34fr);
+}
+
+.polished-vertical-book .vertical-book-left {
+  padding-inline: 20px;
+}
+
+.polished-vertical-book .vertical-sel-content {
+  grid-template-columns: repeat(3, max-content);
+  justify-content: center;
+  justify-items: center;
+  gap: clamp(10px, 1.4vw, 20px);
+  padding-inline: 0;
+}
+
+.polished-vertical-book .vertical-sel-block {
+  width: max-content;
+  max-width: 150px;
+  padding-inline: 4px;
+  gap: 10px;
+}
+
+.polished-vertical-book .vertical-section-label {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  text-align: center;
+  line-height: 1.15;
+  letter-spacing: 0;
+  writing-mode: vertical-rl;
+}
+
+.polished-vertical-book .vertical-question-block {
+  padding-right: 10px;
+}
+
+.polished-vertical-book .vertical-response-note {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  align-self: end;
+  justify-self: center;
+  padding: 10px 7px;
+  border-radius: 999px;
+  background: #fff2c7;
+  color: #7a5a16;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.45;
+  letter-spacing: .04em;
+}
+
+.polished-vertical-book .vertical-contact-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--contact-columns), minmax(0, 1fr));
+  grid-auto-flow: initial;
+  grid-auto-columns: initial;
+  width: 100%;
+  max-width: 100%;
+  gap: clamp(6px, .8vw, 13px);
+  overflow: hidden;
+  padding: 10px 4px 8px;
+}
+
+.polished-vertical-book .vertical-date-column,
+.polished-vertical-book .vertical-contact-item {
+  width: 100%;
+  min-width: 0;
+  padding-inline: clamp(4px, .55vw, 8px);
+}
+
+.polished-vertical-book .vertical-contact-item {
+  font-size: clamp(19px, 1.75vw, 27px);
+}
+
+.polished-vertical-book .vertical-contact-index {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+}
+
+.polished-vertical-book .vertical-date-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font-size: clamp(14px, 1.15vw, 18px);
+  writing-mode: vertical-rl;
+}
+
+.polished-vertical-book .vertical-date-year,
+.polished-vertical-book .vertical-date-month-day {
+  text-combine-upright: all;
+  -webkit-text-combine: horizontal;
+  letter-spacing: 0;
+  white-space: nowrap;
+  font-weight: 950;
+}
+
+.polished-vertical-book .vertical-date-week {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+@media (max-width: 1100px) and (min-width: 901px) {
+  .polished-vertical-book {
+    grid-template-columns: minmax(270px, .62fr) minmax(0, 1.38fr);
+  }
+  .polished-vertical-book .vertical-sel-block strong {
+    font-size: clamp(19px, 1.9vw, 25px);
+  }
+  .polished-vertical-book .vertical-contact-item {
+    font-size: clamp(17px, 1.65vw, 23px);
+  }
+}
+
+@media (max-width: 760px) {
+  .polished-vertical-book .vertical-sel-content {
+    grid-template-columns: repeat(3, max-content);
+    justify-content: center;
+    overflow: hidden;
+  }
+  .polished-vertical-book .vertical-section-label {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+  .polished-vertical-book .vertical-response-note {
+    font-size: 11px;
+    padding: 8px 5px;
+  }
+  .polished-vertical-book .vertical-contact-columns {
+    gap: 5px;
+    overflow: hidden;
+  }
+  .polished-vertical-book .vertical-contact-item {
+    font-size: clamp(14px, 4vw, 18px);
+  }
+  .polished-vertical-book .vertical-contact-index {
+    width: 24px;
+    height: 24px;
+    font-size: 13px;
+  }
+}
+
+/* ✅ HUA_CONTACT_DYNAMIC_FONT_MOBILE_FIX_STYLE_20260710
+   聯絡事項：框格尺寸不變，項目少時字大、項目多時自動縮小；手機改為兩排呈現，避免右頁被壓成細線。 */
+.polished-vertical-book .vertical-contact-item {
+  font-size: clamp(
+    20px,
+    calc(43px - (var(--contact-count, 4) * 2.6px)),
+    36px
+  );
+}
+
+.polished-vertical-book .vertical-contact-text {
+  font-size: inherit;
+  line-height: 1.5;
+  font-weight: 950;
+}
+
+@media (min-width: 901px) {
+  .polished-vertical-book .vertical-contact-columns {
+    min-height: 390px;
+  }
+
+  .polished-vertical-book .vertical-contact-item,
+  .polished-vertical-book .vertical-date-column {
+    height: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .polished-vertical-book {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  .polished-vertical-book .vertical-book-left,
+  .polished-vertical-book .vertical-book-right {
+    min-height: 0 !important;
+  }
+
+  .polished-vertical-book .vertical-book-left {
+    padding-bottom: 18px !important;
+  }
+
+  .polished-vertical-book .vertical-book-right {
+    padding-top: 16px !important;
+  }
+
+  .polished-vertical-book .vertical-contact-columns {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    gap: 8px !important;
+    width: 100% !important;
+    overflow: visible !important;
+    padding: 6px 0 0 !important;
+  }
+
+  .polished-vertical-book .vertical-date-column {
+    grid-column: 1 / -1 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    border: 0 !important;
+    border-radius: 14px !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    font-size: 14px !important;
+  }
+
+  .polished-vertical-book .vertical-date-year,
+  .polished-vertical-book .vertical-date-month-day,
+  .polished-vertical-book .vertical-date-week {
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    white-space: nowrap !important;
+  }
+
+  .polished-vertical-book .vertical-contact-item {
+    min-height: 220px !important;
+    height: 220px !important;
+    width: 100% !important;
+    padding: 8px 4px !important;
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, .78) !important;
+    font-size: clamp(
+      17px,
+      calc(28px - (var(--contact-count, 4) * 1px)),
+      24px
+    ) !important;
+  }
+
+  .polished-vertical-book .vertical-contact-index {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 14px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .polished-vertical-book .vertical-contact-text {
+    line-height: 1.35 !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .polished-vertical-book .vertical-contact-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .polished-vertical-book .vertical-contact-item {
+    min-height: 210px !important;
+    height: 210px !important;
+  }
+}
+
+/* ✅ HUA_VERTICAL_BOOK_DATE_NOTE_LINES_FIX_STYLE_20260710
+   日期改為三行完整橫排；作答提醒改為左頁底部橫式大字；聯絡簿移除欄間分隔線。 */
+
+/* 左右頁保留柔和紙張感，但聯絡簿頁不再畫直向欄線。 */
+.polished-vertical-book .vertical-book-right {
+  background-image: none !important;
+}
+
+/* 移除每一列之間的線條與白色長條框感。 */
+.polished-vertical-book .vertical-contact-columns {
+  gap: clamp(8px, 1vw, 16px) !important;
+}
+
+.polished-vertical-book .vertical-contact-item {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 日期以完整字串呈現，不再把 2026、7月10日拆成怪異直排。 */
+.polished-vertical-book .vertical-date-column {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  min-width: 82px !important;
+  padding: 18px 8px !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: rgba(236, 246, 240, .88) !important;
+  line-height: 1.25 !important;
+}
+
+.polished-vertical-book .vertical-date-year,
+.polished-vertical-book .vertical-date-month-day,
+.polished-vertical-book .vertical-date-week {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  text-combine-upright: none !important;
+  -webkit-text-combine: none !important;
+  display: block !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  letter-spacing: .04em !important;
+  font-weight: 950 !important;
+  color: #2f6f57 !important;
+}
+
+.polished-vertical-book .vertical-date-year {
+  font-size: clamp(17px, 1.45vw, 22px) !important;
+}
+
+.polished-vertical-book .vertical-date-month-day {
+  font-size: clamp(18px, 1.55vw, 24px) !important;
+}
+
+.polished-vertical-book .vertical-date-week {
+  font-size: clamp(15px, 1.25vw, 19px) !important;
+  color: #5f8f79 !important;
+}
+
+/* 左頁改成「內容在上、提醒在最下方」，不再把提醒擠成一條直柱。 */
+.polished-vertical-book .vertical-book-left {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.polished-vertical-book .vertical-sel-content {
+  flex: 1 1 auto !important;
+  grid-template-columns: repeat(2, max-content) !important;
+  align-content: start !important;
+  min-height: 0 !important;
+}
+
+.polished-vertical-book .vertical-response-note {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  align-self: stretch !important;
+  justify-self: auto !important;
+  width: min(100%, 430px) !important;
+  margin: 16px auto 0 !important;
+  padding: 13px 18px !important;
+  border: 1.5px solid #f0cf77 !important;
+  border-radius: 16px !important;
+  background: #fff7d9 !important;
+  color: #765816 !important;
+  font-size: clamp(17px, 1.55vw, 22px) !important;
+  font-weight: 950 !important;
+  line-height: 1.55 !important;
+  letter-spacing: .01em !important;
+  text-align: center !important;
+  overflow-wrap: normal !important;
+}
+
+/* 手機：日期保持清楚橫排，提醒完整顯示，聯絡事項不被擠成細欄。 */
+@media (max-width: 760px) {
+  .polished-vertical-book .vertical-date-column {
+    grid-column: 1 / -1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 7px 12px !important;
+    padding: 10px 12px !important;
+  }
+
+  .polished-vertical-book .vertical-date-year,
+  .polished-vertical-book .vertical-date-month-day,
+  .polished-vertical-book .vertical-date-week {
+    font-size: 14px !important;
+  }
+
+  .polished-vertical-book .vertical-response-note {
+    width: 100% !important;
+    margin-top: 14px !important;
+    padding: 12px 14px !important;
+    font-size: 16px !important;
+  }
+
+  .polished-vertical-book .vertical-sel-content {
+    grid-template-columns: repeat(2, max-content) !important;
+  }
+}
+
+
+
+/* ✅ HUA_CONTACT_DATE_IN_HEADING_STYLE_20260710
+   日期移到「聯絡簿」標題後方；移除 7、8 項之間的中央分隔線；右頁不再保留日期欄。 */
+
+.polished-vertical-book::after {
+  display: none !important;
+}
+
+.polished-vertical-book {
+  grid-template-columns: minmax(260px, .58fr) minmax(0, 1.42fr) !important;
+}
+
+.polished-vertical-book .vertical-book-left,
+.polished-vertical-book .vertical-book-right {
+  border: 0 !important;
+}
+
+.polished-vertical-book .vertical-book-right {
+  background-image: none !important;
+}
+
+.contact-heading-with-date {
+  width: 100% !important;
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  flex-wrap: wrap !important;
+  padding-inline: 12px !important;
+  letter-spacing: .18em !important;
+}
+
+.contact-heading-date {
+  color: #6f8d7e;
+  font-size: clamp(14px, 1.1vw, 17px);
+  font-weight: 850;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.polished-vertical-book .vertical-contact-columns {
+  grid-template-columns: repeat(var(--contact-columns), minmax(0, 1fr)) !important;
+  gap: clamp(8px, 1vw, 16px) !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.polished-vertical-book .vertical-contact-item {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.polished-vertical-book .vertical-date-column {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .contact-heading-with-date {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .contact-heading-date {
+    font-size: 13px !important;
+  }
+}

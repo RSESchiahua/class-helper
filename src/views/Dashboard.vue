@@ -1,8 +1,78 @@
 <script setup>
-import { ref, computed } from 'vue'
+// ✅ HUA_CONTACT_DATE_IN_HEADING_20260710：日期移到「聯絡簿」標題後方，並移除中央分隔線。
+// ✅ HUA_VERTICAL_BOOK_DATE_NOTE_LINES_FIX_20260710：日期重排、提示放大置底、移除聯絡簿分隔線。
+import { ref, computed, watch } from 'vue'
 
 const className = ref(localStorage.getItem('className') || '')
 const studentSource = ref(localStorage.getItem('students') || '')
+
+
+// ✅ HUA_HOME_CONTACT_BOOK_OPTIONAL_20260710：可選的直式聯絡事項，手機可直接編輯。
+const showHomeSettings = ref(false)
+const isEditingContactBook = ref(false)
+const homeDisplay = ref(loadJson('classHelperHomeDisplay', {
+  contactBook: true,
+  dailyQuote: true,
+  reflection: true,
+  contactLayout: 'horizontal'
+}))
+const contactBook = ref(loadJson('classHelperContactBook', {
+  homework: '',
+  carry: '',
+  reminder: ''
+}))
+
+const contactSections = computed(() => [
+  { key: 'homework', icon: '📚', title: '作業', items: toLines(contactBook.value.homework) },
+  { key: 'carry', icon: '🎒', title: '攜帶物品', items: toLines(contactBook.value.carry) },
+  { key: 'reminder', icon: '📌', title: '提醒', items: toLines(contactBook.value.reminder) }
+])
+
+const mergedContactItems = computed(() =>
+  contactSections.value.flatMap(section => section.items)
+)
+
+const isVerticalContactLayout = computed(() =>
+  homeDisplay.value.contactLayout === 'vertical'
+)
+
+const verticalDateParts = computed(() => {
+  const date = new Date()
+  const week = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+  return {
+    year: `${date.getFullYear()}年`,
+    monthDay: `${date.getMonth() + 1}月${date.getDate()}日`,
+    week: `星期${week}`
+  }
+})
+
+watch(homeDisplay, value => {
+  localStorage.setItem('classHelperHomeDisplay', JSON.stringify(value))
+}, { deep: true })
+
+watch(contactBook, value => {
+  localStorage.setItem('classHelperContactBook', JSON.stringify(value))
+}, { deep: true })
+
+function loadJson(key, fallback) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '')
+    return parsed && typeof parsed === 'object' ? { ...fallback, ...parsed } : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function toLines(value) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+}
+
+function finishContactBookEditing() {
+  isEditingContactBook.value = false
+}
 
 // ✅ HUA_DAILY_SEL_365_WITH_QUESTION_20260710：365 天每日一句＋SEL 互動提問，依日期固定顯示。
 const dailyMessages = [
@@ -196,7 +266,7 @@ const dailyMessages = [
   {"quote": "真正的包容，常常藏在沒有人提醒時的小選擇裡。", "question": "我曾在哪個時刻看見自己或同學做到「包容」？"},
   {"quote": "今天練習一點包容，明天的自己就會多一點力量。", "question": "如果今天要把「包容」送給班級，我會怎麼做？"},
   {"quote": "包容不是一句口號，而是可以被看見的行動。", "question": "回想今天，我在哪件事上還能多一點「包容」？"},
-  {"quote": "看見別人需要幫忙時，願意問一句就很溫暖。", "question": "今天我想關心哪一位同學？"},
+  {"quote": "看見別人需要幫忙時，一句詢問會讓人很溫暖。", "question": "今天我想關心哪一位同學？"},
   {"quote": "把「關懷」放進今天的行動裡，你會看見不一樣的自己。", "question": "今天我可以用哪一個行動練習「關懷」？"},
   {"quote": "真正的關懷，常常藏在沒有人提醒時的小選擇裡。", "question": "我曾在哪個時刻看見自己或同學做到「關懷」？"},
   {"quote": "今天練習一點關懷，明天的自己就會多一點力量。", "question": "如果今天要把「關懷」送給班級，我會怎麼做？"},
@@ -443,15 +513,113 @@ function formatToday(date) {
 
 <template>
   <div class="dashboard home-dashboard">
-    <section class="home-hero card">
+    <div class="home-top-actions">
+      <button class="home-settings-button" type="button" @click="showHomeSettings = !showHomeSettings">
+        ⚙️ 首頁設定
+      </button>
+    </div>
+
+    <section v-if="showHomeSettings" class="card home-settings-card">
+      <div>
+        <h3>⚙️ 首頁顯示</h3>
+        <p>依照班級使用方式，選擇首頁要出現的內容。</p>
+      </div>
+      <label><input v-model="homeDisplay.contactBook" type="checkbox"> 📝 今日聯絡事項</label>
+      <label><input v-model="homeDisplay.dailyQuote" type="checkbox"> 🌱 今日一句</label>
+      <label><input v-model="homeDisplay.reflection" type="checkbox"> 💭 今天想一想</label>
+      <div v-if="homeDisplay.contactBook" class="contact-layout-setting">
+        <strong>聯絡簿版面</strong>
+        <label><input v-model="homeDisplay.contactLayout" type="radio" value="horizontal"> 橫式</label>
+        <label><input v-model="homeDisplay.contactLayout" type="radio" value="vertical"> 直式（由右往左）</label>
+      </div>
+    </section>
+
+    <!-- ✅ HUA_CONTACT_DYNAMIC_FONT_MOBILE_FIX_20260710：聯絡事項依數量自動縮放字級，手機改為可讀的兩排直式卡片。 -->
+    <section
+      v-if="homeDisplay.contactBook && isVerticalContactLayout"
+      class="card contact-book-card vertical-contact-card"
+    >
+      <header class="contact-book-header">
+        <div>
+          <span class="eyebrow">📝 今日聯絡事項</span>
+          <h2>直式聯絡簿模式</h2>
+        </div>
+        <button v-if="!isEditingContactBook" type="button" class="contact-edit-button" @click="isEditingContactBook = true">✏️ 編輯</button>
+        <button v-else type="button" class="contact-done-button" @click="finishContactBookEditing">✓ 完成</button>
+      </header>
+
+      <div v-if="isEditingContactBook" class="contact-book-editor">
+        <label><span>📚 作業</span><textarea v-model="contactBook.homework" rows="4" placeholder="每一行輸入一項作業"></textarea></label>
+        <label><span>🎒 攜帶物品</span><textarea v-model="contactBook.carry" rows="3" placeholder="每一行輸入一項攜帶物品"></textarea></label>
+        <label><span>📌 提醒</span><textarea v-model="contactBook.reminder" rows="3" placeholder="每一行輸入一項提醒"></textarea></label>
+      </div>
+
+      <div v-else class="vertical-book-spread polished-vertical-book">
+        <section class="vertical-book-left">
+          <div class="book-page-heading">親師交流</div>
+          <div v-if="homeDisplay.dailyQuote" class="vertical-sel-content">
+            <div class="vertical-sel-block vertical-quote-block">
+              <span class="vertical-section-label">今日一句</span>
+              <strong>{{ currentQuote }}</strong>
+            </div>
+            <div v-if="homeDisplay.reflection" class="vertical-sel-block vertical-question-block">
+              <span class="vertical-section-label">想一想</span>
+              <strong>{{ currentQuestion }}</strong>
+            </div>
+          </div>
+          <div v-if="homeDisplay.reflection" class="vertical-response-note">
+            ✍️ 請在今天的聯絡簿空白處回答哦！
+          </div>
+        </section>
+
+        <section class="vertical-book-right">
+          <div class="book-page-heading contact-heading-with-date">
+            <span>聯絡簿</span>
+            <span class="contact-heading-date">
+              {{ verticalDateParts.year }} {{ verticalDateParts.monthDay }}（{{ verticalDateParts.week }}）
+            </span>
+          </div>
+          <div
+            class="vertical-contact-columns"
+            :style="{ '--contact-columns': Math.max(mergedContactItems.length, 1), '--contact-count': mergedContactItems.length }"
+          >
+            <div v-for="(item, index) in mergedContactItems" :key="`vertical-contact-${index}`" class="vertical-contact-item">
+              <span class="vertical-contact-index">{{ index + 1 }}</span>
+              <span class="vertical-contact-text">{{ item }}</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section v-if="homeDisplay.contactBook && !isVerticalContactLayout" class="card contact-book-card">
+      <header class="contact-book-header">
+        <div><span class="eyebrow">📝 今日聯絡事項</span><h2>請依序抄寫在聯絡簿上</h2></div>
+        <button v-if="!isEditingContactBook" type="button" class="contact-edit-button" @click="isEditingContactBook = true">✏️ 編輯</button>
+        <button v-else type="button" class="contact-done-button" @click="finishContactBookEditing">✓ 完成</button>
+      </header>
+      <div v-if="isEditingContactBook" class="contact-book-editor">
+        <label><span>📚 作業</span><textarea v-model="contactBook.homework" rows="4" placeholder="每一行輸入一項作業"></textarea></label>
+        <label><span>🎒 攜帶物品</span><textarea v-model="contactBook.carry" rows="3" placeholder="每一行輸入一項攜帶物品"></textarea></label>
+        <label><span>📌 提醒</span><textarea v-model="contactBook.reminder" rows="3" placeholder="每一行輸入一項提醒"></textarea></label>
+      </div>
+      <div v-else class="contact-book-display">
+        <section v-for="section in contactSections" :key="section.key" class="contact-section">
+          <h3>{{ section.icon }} {{ section.title }}</h3>
+          <ol><li v-for="(item, index) in section.items" :key="`${section.key}-${index}`">{{ item }}</li></ol>
+        </section>
+      </div>
+    </section>
+
+    <section v-if="homeDisplay.dailyQuote && !isVerticalContactLayout" class="home-hero card">
       <div class="home-hero-text">
         <span class="eyebrow">🌱 今日一句</span>
         <h2>{{ currentQuote }}</h2>
         <p>第 {{ dailyQuoteIndex + 1 }} / 365 天｜品格 × SEL</p>
-        <div class="daily-reflection">
+        <div v-if="homeDisplay.reflection" class="daily-reflection">
           <span>💭 今天想一想</span>
-          <strong>{{ currentQuestion }}</strong>
-          <small>請試著寫在聯絡簿空白處。</small>
+          <strong class="daily-question">❓ {{ currentQuestion }}</strong>
+          <small>✍️ 請在今天聯絡簿空白處回答哦！</small>
         </div>
       </div>
     </section>
@@ -652,4 +820,202 @@ function formatToday(date) {
   .home-hero { min-height: auto; }
   .daily-reflection { padding: 12px; }
 }
+
+
+/* ✅ HUA_HOME_CONTACT_BOOK_LAYOUT_20260710：直式聯絡事項＋首頁顯示設定。 */
+.home-top-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.home-settings-button,
+.contact-edit-button,
+.contact-done-button {
+  padding: 9px 14px;
+  border-radius: 13px;
+  font-size: 14px;
+}
+
+.home-settings-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(3, auto);
+  align-items: center;
+  gap: 14px;
+  margin-top: 0;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+}
+
+.home-settings-card h3,
+.home-settings-card p {
+  margin: 0;
+}
+
+.home-settings-card p {
+  margin-top: 5px;
+  color: #667085;
+  font-size: 14px;
+}
+
+.home-settings-card label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f4fbf7;
+  color: #345;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.contact-book-card {
+  margin-top: 0;
+  padding: clamp(20px, 3vw, 30px);
+  background: linear-gradient(160deg, #fffefb, #fff8f0 56%, #f4fbf7);
+  border: 1px solid #eadfce;
+}
+
+.contact-book-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.contact-book-header h2 {
+  margin: 2px 0 0;
+  color: #243b53;
+  font-size: clamp(20px, 2.6vw, 29px);
+}
+
+.contact-book-display {
+  display: grid;
+  grid-template-columns: 1.2fr .9fr .9fr;
+  gap: 16px;
+}
+
+.contact-section {
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .88);
+  border: 1px solid #e7eadf;
+}
+
+.contact-section h3 {
+  margin: 0 0 10px;
+  color: #2f6f57;
+  font-size: 19px;
+}
+
+.contact-section ol {
+  margin: 0;
+  padding-left: 1.7em;
+}
+
+.contact-section li {
+  margin: 8px 0;
+  padding-left: 3px;
+  color: #243b53;
+  font-size: clamp(18px, 2.1vw, 25px);
+  font-weight: 850;
+  line-height: 1.5;
+}
+
+.contact-book-editor {
+  display: grid;
+  grid-template-columns: 1.2fr .9fr .9fr;
+  gap: 14px;
+}
+
+.contact-book-editor label {
+  display: grid;
+  gap: 8px;
+  color: #2f6f57;
+  font-weight: 900;
+}
+
+.contact-book-editor textarea {
+  width: 100%;
+  min-height: 132px;
+  resize: vertical;
+  padding: 13px 14px;
+  border: 2px solid #dceee6;
+  border-radius: 16px;
+  background: #fff;
+  color: #243b53;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.home-hero-text {
+  width: 100%;
+}
+
+.home-hero h2 {
+  max-width: 100%;
+  font-size: clamp(27px, 4vw, 45px);
+  line-break: strict;
+  word-break: normal;
+}
+
+.daily-question {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff8dc;
+  border: 1px solid #f2df9d;
+}
+
+.daily-reflection small {
+  color: #2f6f57;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+@media (max-width: 900px) {
+  .home-settings-card,
+  .contact-book-display,
+  .contact-book-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .home-settings-card label {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-top-actions {
+    justify-content: stretch;
+  }
+
+  .home-settings-button {
+    width: 100%;
+  }
+
+  .contact-book-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .contact-edit-button,
+  .contact-done-button {
+    width: 100%;
+  }
+
+  .contact-section li {
+    font-size: 18px;
+  }
+
+  .home-hero h2 {
+    font-size: clamp(25px, 7.4vw, 34px);
+    line-height: 1.34;
+  }
+}
+
 </style>
