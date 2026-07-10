@@ -115,6 +115,7 @@
 </template>
 
 <script setup>
+// ✅ HUA_WHEEL_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
 import { computed, nextTick, ref, watch } from 'vue'
 
 const mode = ref('students')
@@ -601,4 +602,58 @@ li button { border: 0; background: transparent; color: #a98070; font-size: 22px;
     max-width: none;
   }
 }
+
+
+/* ✅ HUA_WHEEL_ONE_SCREEN_MOBILE_REVIEW_20260710
+   抽籤轉盤：桌機轉盤與設定同頁；手機改成上下排列不擠壓。 */
+@media (min-width: 1101px) and (max-height: 820px) {
+  .wheel-page {
+    height: calc(100svh - 40px) !important;
+    padding: 18px 22px 12px !important;
+  }
+
+  .wheel-header {
+    margin-bottom: 10px !important;
+  }
+
+  .wheel-header h2 {
+    font-size: 26px !important;
+  }
+
+  .wheel-layout {
+    grid-template-columns: minmax(460px, 1fr) 360px !important;
+    gap: 14px !important;
+    height: calc(100% - 64px) !important;
+  }
+
+  .panel-card {
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .panel-card h3 {
+    font-size: 15px !important;
+    margin-bottom: 7px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .wheel-page {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 14px 10px 24px !important;
+  }
+
+  .wheel-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .wheel-layout {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+}
+
 </style>

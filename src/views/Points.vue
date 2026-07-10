@@ -1,6 +1,9 @@
 <script setup>
+// ✅ HUA_POINTS_2_CLASS_COMPLETION_ONLY_20260710：完成事件只提供全班 +1；一般積分頁仍保留老師手動小組加分。
+// ✅ HUA_POINTS_2_COMPLETION_INTEGRATION_20260710：積分頁可即時接收全班完成鼓勵加分。
+// ✅ HUA_POINTS_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
 // POINTS_V5_CONFIRMED_WITH_SEATS_20260707：已對照 Seats.vue 的 classHelperSeatPlan，學生三欄、音效、小組加分、兌換X置中都在這份檔案。
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 // POINTS_REWARD_SYSTEM_20260707_NO_LIBRARY：積分獎勵獨立運作，班書借閱先不納入積分。
 const POINT_RECORDS_KEY = 'classAssistantPointRecordsV1'
@@ -111,6 +114,21 @@ const activePanel = ref('records')
 const newRewardName = ref('')
 const newRewardCost = ref(10)
 const importInput = ref(null)
+
+// ✅ HUA_POINTS_2_SHARED_RECORD_REFRESH_20260710：接收簿本／潔牙完成視窗寫入的積分紀錄。
+function refreshSharedPointRecords() {
+  records.value = loadJson(POINT_RECORDS_KEY, [])
+}
+
+onMounted(() => {
+  window.addEventListener('class-helper-points-updated', refreshSharedPointRecords)
+  window.addEventListener('focus', refreshSharedPointRecords)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('class-helper-points-updated', refreshSharedPointRecords)
+  window.removeEventListener('focus', refreshSharedPointRecords)
+})
 
 const students = computed(() =>
   studentText.value
@@ -1680,4 +1698,89 @@ function importPoints(event) {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ✅ HUA_POINTS_ONE_SCREEN_MOBILE_REVIEW_20260710
+   積分獎勵：桌機三區一頁式；手機依序顯示學生、加扣分、紀錄。 */
+@media (min-width: 1121px) and (max-height: 860px) {
+  .points-layout {
+    grid-template-columns: minmax(300px, .92fr) minmax(300px, 1fr) minmax(300px, .95fr) !important;
+    gap: 12px !important;
+    min-height: calc(100svh - 118px) !important;
+  }
+
+  .points-student-grid {
+    max-height: calc(100svh - 198px) !important;
+    gap: 6px !important;
+    padding: 4px 8px 12px 2px !important;
+  }
+
+  .points-student-card {
+    min-height: 68px !important;
+    padding: 6px 5px !important;
+    border-radius: 14px !important;
+  }
+
+  .points-student-card strong {
+    font-size: 14px !important;
+  }
+
+  .points-student-card em {
+    font-size: 12px !important;
+  }
+
+  .selected-student-box,
+  .group-point-box {
+    padding: 13px !important;
+    margin-top: 10px !important;
+  }
+
+  .quick-point-buttons {
+    gap: 6px !important;
+  }
+
+  .quick-point-buttons button {
+    padding: 8px 6px !important;
+  }
+
+  .reason-chips {
+    gap: 6px !important;
+  }
+
+  .reason-chip {
+    padding: 7px 9px !important;
+  }
+
+  .points-action-card textarea {
+    min-height: 56px !important;
+  }
+
+  .panel-scroll {
+    max-height: calc(100svh - 190px) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .points-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .points-student-grid,
+  .panel-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .points-student-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .points-student-grid,
+  .quick-point-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
 </style>

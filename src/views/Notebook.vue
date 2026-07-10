@@ -1,4 +1,6 @@
 <script setup>
+// ✅ HUA_POINTS_2_NOTEBOOK_INTEGRATION_20260710：簿本全班完成會先慶祝，再由老師選擇是否全班 +1。
+// ✅ HUA_NOTEBOOK_ONE_SCREEN_MOBILE_REVIEW_20260710：簿本頁已補桌機一頁式壓縮與手機不卡片切半。
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 
 const homeworkOptions = [
@@ -21,6 +23,116 @@ const students = computed(() => {
 })
 
 const className = computed(() => localStorage.getItem('className') || '三年○班')
+
+// ✅ HUA_COMPLETION_CLASS_ONLY_REWARD_20260710：全班完成後由老師決定是否加分，不自動發放。
+const COMPLETION_POINT_RECORDS_KEY = 'classAssistantPointRecordsV1'
+const COMPLETION_GROUPS_KEY = 'classHelperSeatGroupsForPoints'
+const completionRewardOpen = ref(false)
+const completionRewardSource = ref('')
+const completionRewardTitle = ref('')
+const completionRewardMessage = ref('')
+const completionRewardIcon = ref('🌟')
+const completionPrompted = reactive({})
+
+function parseCompletionStudent(line, index) {
+  const text = String(line || '').trim()
+  const match = text.match(/^(\d{1,2})[\s、.．,\-]+(.+)$/)
+  return match
+    ? { seatNo: Number(match[1]), name: match[2].trim(), key: `${Number(match[1])}__${match[2].trim()}` }
+    : { seatNo: index + 1, name: cleanStudentName(text), key: `${index + 1}__${cleanStudentName(text)}` }
+}
+
+const completionStudents = computed(() => students.value.map(parseCompletionStudent))
+
+
+function normalizedCompletionName(value) {
+  return String(value || '').replace(/^\s*(?:座號)?\d{1,2}[.、．)）\- ]+/, '').replace(/[\s　]/g, '').trim()
+}
+
+function loadCompletionPointRecords() {
+  try {
+    const data = JSON.parse(localStorage.getItem(COMPLETION_POINT_RECORDS_KEY) || '[]')
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+function playCompletionCelebrationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return
+    const ctx = new AudioContextClass()
+    const notes = [523.25, 659.25, 783.99, 1046.5]
+    notes.forEach((frequency, index) => {
+      const start = ctx.currentTime + index * 0.1
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(frequency, start)
+      gain.gain.setValueAtTime(0.001, start)
+      gain.gain.exponentialRampToValueAtTime(0.13, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(start)
+      osc.stop(start + 0.18)
+    })
+  } catch (error) {
+    console.warn('完成慶祝音效無法播放：', error)
+  }
+}
+
+function saveCompletionPoints(targetStudents, reason, type, extra = {}) {
+  const records = loadCompletionPointRecords()
+  const now = new Date().toISOString()
+  targetStudents.forEach((student, index) => {
+    records.push({
+      id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+      studentKey: student.key,
+      seatNo: student.seatNo,
+      name: student.name,
+      delta: 1,
+      reason,
+      note: '由全班完成鼓勵視窗發放',
+      type,
+      createdAt: now,
+      source: completionRewardSource.value,
+      ...extra
+    })
+  })
+  localStorage.setItem(COMPLETION_POINT_RECORDS_KEY, JSON.stringify(records))
+  window.dispatchEvent(new CustomEvent('class-helper-points-updated'))
+  playCompletionCelebrationSound()
+}
+
+function openCompletionReward({ source, title, message, icon = '🌟', promptKey }) {
+  if (completionPrompted[promptKey]) return
+  completionPrompted[promptKey] = true
+  completionRewardSource.value = source
+  completionRewardTitle.value = title
+  completionRewardMessage.value = message
+  completionRewardIcon.value = icon
+  playCompletionCelebrationSound()
+  setTimeout(() => { completionRewardOpen.value = true }, 650)
+}
+
+function closeCompletionReward() {
+  completionRewardOpen.value = false
+}
+
+function rewardWholeClass() {
+  if (!completionStudents.value.length) return
+  saveCompletionPoints(
+    completionStudents.value,
+    `${completionRewardTitle.value}｜全班完成`,
+    'completion-class'
+  )
+  showToast(`⭐ 已替全班 ${completionStudents.value.length} 位學生各加 1 分`, 2200)
+  closeCompletionReward()
+}
+
+
 
 function cleanStudentName(name = '') {
   return String(name)
@@ -295,10 +407,20 @@ function isAllOk(board) {
 
 function checkAllDone(board) {
   if (!students.value.length) return
+  const promptKey = `notebook-${todayKey()}-${board.id}`
 
   if (isAllOk(board)) {
     showToast(`🎉 ${getTitle(board)} 全班完成！`, 2200)
     playRewardSound()
+    openCompletionReward({
+      source: 'notebook',
+      title: `${getTitle(board)}全班完成！`,
+      message: '今天大家都很可靠，繳交與訂正都完成了！',
+      icon: '📚',
+      promptKey
+    })
+  } else {
+    completionPrompted[promptKey] = false
   }
 }
 
@@ -803,6 +925,22 @@ function formatDate(dateText) {
           </button>
         </div>
       </div>
+    </div>
+
+
+    <div v-if="completionRewardOpen" class="completion-reward-overlay" @click.self="closeCompletionReward">
+      <section class="completion-reward-modal" role="dialog" aria-modal="true" aria-labelledby="completionRewardTitle">
+        <div class="completion-stars" aria-hidden="true">⭐ ✨ ⭐</div>
+        <div class="completion-icon">{{ completionRewardIcon }}</div>
+        <h3 id="completionRewardTitle">{{ completionRewardTitle }}</h3>
+        <p class="completion-message">{{ completionRewardMessage }}</p>
+        <p class="completion-thanks">謝謝大家一起讓班級變得更好。❤️</p>
+
+        <div class="completion-reward-actions">
+          <button type="button" class="reward-class-button" @click="rewardWholeClass">👍 全班 +1</button>
+          <button type="button" class="reward-skip-button" @click="closeCompletionReward">❤️ 今天不用</button>
+        </div>
+      </section>
     </div>
 
     <div v-if="toast" class="toast">
@@ -1953,6 +2091,227 @@ body:has(.modal-backdrop) {
   .weekly-modal-compact .summary-student {
     min-width: 108px !important;
   }
+}
+
+
+
+/* ✅ HUA_NOTEBOOK_ONE_SCREEN_MOBILE_REVIEW_20260710
+   簿本繳交：桌機顯示盡量塞進一頁；手機改成單欄、卡片不被切到。 */
+@media (min-width: 1181px) and (max-height: 860px) {
+  .page-header {
+    margin-bottom: 10px !important;
+  }
+
+  .page-header h2 {
+    margin: 0 0 4px !important;
+    font-size: 26px !important;
+  }
+
+  .page-header p {
+    margin: 0 !important;
+    font-size: 14px !important;
+  }
+
+  .layout-grid {
+    grid-template-columns: 218px minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .weekly-overview {
+    gap: 8px !important;
+  }
+
+  .overview-card,
+  .overview-list {
+    padding: 11px !important;
+    border-radius: 18px !important;
+  }
+
+  .overview-card strong {
+    font-size: 30px !important;
+  }
+
+  .overview-list h3 {
+    font-size: 15px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .rank-row {
+    padding: 7px 8px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .zero-tags span {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+  }
+
+  .notebook-grid,
+  .notebook-grid.compact,
+  .notebook-grid.compact.triple {
+    gap: 10px !important;
+  }
+
+  .notebook-card,
+  .notebook-card.compact {
+    padding: 10px !important;
+    border-radius: 18px !important;
+  }
+
+  .board-toolbar {
+    gap: 6px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .board-toolbar button,
+  .board-toolbar select,
+  .notebook-card.compact .board-toolbar button,
+  .notebook-card.compact .board-toolbar select {
+    padding: 6px 7px !important;
+    font-size: 12px !important;
+    border-radius: 11px !important;
+  }
+
+  .board-title-line {
+    margin: 4px 0 6px !important;
+    font-size: 12px !important;
+  }
+
+  .board-title-line strong {
+    font-size: 15px !important;
+  }
+
+  .seat-grid,
+  .notebook-card.compact .seat-grid,
+  .notebook-grid.compact .seat-grid,
+  .notebook-grid.compact.triple .seat-grid {
+    gap: 6px !important;
+  }
+
+  .seat,
+  .notebook-card.compact .seat,
+  .notebook-grid.compact.triple .seat {
+    min-height: 56px !important;
+    padding: 4px 3px !important;
+    border-radius: 12px !important;
+  }
+
+  .seat strong,
+  .notebook-card.compact .seat strong,
+  .notebook-grid.compact.triple .seat strong {
+    font-size: 13px !important;
+  }
+
+  .seat small,
+  .notebook-card.compact .seat small,
+  .notebook-grid.compact.triple .seat small {
+    font-size: 11px !important;
+  }
+
+  .seat span,
+  .notebook-card.compact .seat span,
+  .notebook-grid.compact.triple .seat span {
+    font-size: 15px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .page-header,
+  .header-actions,
+  .item-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .weekly-overview {
+    position: static !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .overview-list {
+    grid-column: 1 / -1;
+  }
+
+  .notebook-grid,
+  .notebook-grid.double,
+  .notebook-grid.compact,
+  .notebook-grid.compact.triple {
+    grid-template-columns: 1fr !important;
+  }
+
+  .seat-grid,
+  .notebook-card.compact .seat-grid,
+  .notebook-grid.compact .seat-grid,
+  .notebook-grid.compact.triple .seat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .seat,
+  .notebook-card.compact .seat,
+  .notebook-grid.compact.triple .seat {
+    min-height: 70px !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .weekly-overview {
+    grid-template-columns: 1fr !important;
+  }
+
+  .seat-grid,
+  .notebook-card.compact .seat-grid,
+  .notebook-grid.compact .seat-grid,
+  .notebook-grid.compact.triple .seat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+
+/* ✅ HUA_POINTS_2_COMPLETION_REWARD_MODAL_20260710 */
+.completion-reward-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(36, 59, 83, .34);
+  backdrop-filter: blur(6px);
+}
+.completion-reward-modal {
+  width: min(460px, 94vw);
+  max-height: min(720px, 92svh);
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid #f2dfc9;
+  border-radius: 30px;
+  text-align: center;
+  background: linear-gradient(145deg, #fff, #fff9ee 58%, #f2fbf6);
+  box-shadow: 0 26px 80px rgba(36, 59, 83, .28);
+  animation: completionRewardPop .3s ease-out;
+}
+@keyframes completionRewardPop {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.completion-stars { font-size: 25px; letter-spacing: .16em; }
+.completion-icon { margin: 8px 0 2px; font-size: 62px; line-height: 1; }
+.completion-reward-modal h3 { margin: 8px 0; color: #2f6f57; font-size: 28px; }
+.completion-message { margin: 0; color: #465668; font-size: 18px; font-weight: 800; line-height: 1.65; }
+.completion-thanks { margin: 14px 0 20px; color: #8a5a44; font-weight: 900; }
+.completion-reward-actions { display: grid; gap: 10px; }
+.completion-reward-actions button { min-height: 48px; }
+.reward-class-button { background: #55b98a; }
+.reward-skip-button { background: #f6f3ef; color: #687386; border: 1px solid #e5e7eb; }
+@media (max-width: 520px) {
+  .completion-reward-overlay { align-items: end; padding: 10px; }
+  .completion-reward-modal { width: 100%; padding: 22px 16px calc(18px + env(safe-area-inset-bottom)); border-radius: 26px 26px 18px 18px; }
+  .completion-reward-modal h3 { font-size: 24px; }
+  .completion-icon { font-size: 52px; }
 }
 
 </style>

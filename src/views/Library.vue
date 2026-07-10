@@ -1,4 +1,5 @@
 <script setup>
+// ✅ HUA_LIBRARY_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperLibraryLoans'
@@ -520,4 +521,55 @@ button {
     margin-top: 12px;
   }
 }
+
+
+/* ✅ HUA_LIBRARY_ONE_SCREEN_MOBILE_REVIEW_20260710
+   班書借閱：桌機表單與清單清楚；手機單欄、彈窗不超出。 */
+@media (min-width: 981px) and (max-height: 840px) {
+  .library-header {
+    margin-bottom: 12px !important;
+  }
+
+  .summary div {
+    padding: 12px !important;
+  }
+
+  .summary strong {
+    font-size: 24px !important;
+  }
+
+  .borrow-card,
+  .history-card {
+    margin-top: 12px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .loan-list {
+    gap: 8px !important;
+  }
+
+  .loan-item,
+  .history-item {
+    padding: 10px 12px !important;
+    border-radius: 14px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .modal {
+    width: min(94vw, 620px) !important;
+    max-height: 86svh !important;
+    overflow: auto !important;
+    padding: 18px !important;
+  }
+
+  .modal-actions {
+    flex-direction: column !important;
+  }
+}
+
 </style>

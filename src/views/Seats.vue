@@ -1,4 +1,5 @@
 <script setup>
+// ✅ HUA_SEATS_ONE_SCREEN_MOBILE_REVIEW_20260710：座位安排頁由全域 CSS 控制桌機一頁式與手機可橫向檢視。
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperSeatPlan'
@@ -110,6 +111,7 @@ function resetPlan() {
 </script>
 
 <template>
+  <!-- ✅ HUA_SEATS_ONE_SCREEN_MOBILE_REVIEW_20260710 -->
   <!-- SEATS_POINTS_GROUP_EXPORT_20260707 -->
   <div class="page wide-page seats-page">
     <div class="page-title-row">

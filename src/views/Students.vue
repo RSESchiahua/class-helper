@@ -1,4 +1,5 @@
 <script setup>
+// ✅ HUA_STUDENTS_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
 import { ref, computed, watch } from 'vue'
 
 const className = ref(localStorage.getItem('className') || '')
@@ -294,4 +295,35 @@ h3 {
     font-size: 13px;
   }
 }
+
+
+/* ✅ HUA_STUDENTS_ONE_SCREEN_MOBILE_REVIEW_20260710
+   學生名單：桌機方格可讀、手機兩欄不爆版。 */
+@media (min-width: 981px) and (max-height: 820px) {
+  .student-editor-grid {
+    gap: 14px !important;
+  }
+
+  .student-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .student-card {
+    min-height: 74px !important;
+    padding: 10px 8px !important;
+  }
+
+  .student-name {
+    font-size: 16px !important;
+    margin-top: 6px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .student-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
 </style>

@@ -526,3 +526,634 @@ input, textarea, select { font-family: inherit; }
     font-size: 12px;
   }
 }
+
+/* ✅ HUA_CLASS_HELPER_RESPONSIVE_REVIEW_20260710：全站桌機一頁式優先、手機美觀可滑動。 */
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.app-shell {
+  min-height: 100svh;
+}
+
+.main-content {
+  min-width: 0;
+}
+
+.card,
+.calendar-main,
+.detail-panel {
+  max-width: 100%;
+}
+
+.sidebar-group-toggle {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px solid #f1e6d8;
+  border-radius: 16px;
+  background: #fff8f0;
+  color: #345;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.sidebar-group-toggle.active,
+.sidebar-group-toggle.expanded {
+  background: #dff3ea;
+  color: #2f6f57;
+}
+
+.group-chevron {
+  flex: 0 0 auto;
+  color: #86a99a;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.sidebar-subnav {
+  display: grid;
+  gap: 8px;
+  padding: 0 0 0 14px;
+  border-left: 3px solid #dff3ea;
+}
+
+.sidebar-sublink {
+  min-height: 42px !important;
+  padding: 8px 8px !important;
+  border-radius: 14px !important;
+  background: #fffdfa !important;
+  font-size: 14px;
+}
+
+.sidebar-sublink.router-link-active {
+  background: #dff3ea !important;
+  color: #2f6f57 !important;
+}
+
+@media (min-width: 981px) {
+  .sidebar {
+    max-height: 100svh;
+    overflow-y: auto;
+  }
+
+  .main-content {
+    min-height: 100svh;
+  }
+}
+
+@media (min-width: 981px) and (max-height: 760px) {
+  .sidebar {
+    padding: 16px 14px;
+    gap: 10px;
+  }
+
+  .logo-title {
+    font-size: 22px;
+  }
+
+  .sidebar a,
+  .sidebar-group-toggle {
+    min-height: 42px;
+    padding: 8px 8px;
+    border-radius: 14px;
+  }
+
+  .sidebar-subnav {
+    gap: 6px;
+  }
+
+  .main-content {
+    padding: 20px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 980px) {
+  .sidebar-nav {
+    align-items: center;
+  }
+
+  .sidebar-group-toggle {
+    flex: 0 0 auto;
+    min-width: 114px;
+    min-height: 42px;
+    padding: 9px 12px;
+    font-size: 14px;
+    scroll-snap-align: start;
+  }
+
+  .sidebar-subnav {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    padding: 0;
+    border-left: 0;
+  }
+
+  .sidebar-sublink {
+    flex: 0 0 auto;
+    min-width: 104px !important;
+    min-height: 42px !important;
+    font-size: 13px;
+    scroll-snap-align: start;
+  }
+
+  .group-chevron {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 520px) {
+  .sidebar-group-toggle {
+    min-width: 104px;
+    font-size: 13px;
+    border-radius: 14px;
+  }
+
+  .sidebar-sublink {
+    min-width: 96px !important;
+  }
+
+  .drag-handle {
+    display: none;
+  }
+}
+
+/* ✅ HUA_MOBILE_NO_HORIZONTAL_SCROLL_20260710
+   手機版採一般直向操作：工具列網格排列、內容 fit 螢幕、只需上下滑動。 */
+@media (max-width: 760px) {
+  html,
+  body,
+  #app {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip !important;
+  }
+
+  body {
+    min-width: 0 !important;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  .app-shell,
+  .main-content,
+  .page,
+  .wide-page,
+  .dashboard,
+  .wheel-page,
+  .card,
+  section,
+  main,
+  form {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  img,
+  svg,
+  canvas,
+  video {
+    max-width: 100%;
+  }
+
+  h1,
+  h2,
+  h3,
+  p,
+  label,
+  strong,
+  span {
+    overflow-wrap: anywhere;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* ✅ HUA_MOBILE_NAV_GRID_20260710：手機工具列固定四欄，不再左右滑。 */
+  .sidebar {
+    position: relative !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 10px 10px 12px !important;
+    gap: 8px !important;
+    overflow: visible !important;
+    border-bottom: 1px solid #f1e6d8;
+    box-shadow: 0 5px 18px rgba(36, 59, 83, .06);
+  }
+
+  .logo-button {
+    display: none !important;
+  }
+
+  .sidebar-nav {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    align-items: stretch !important;
+    gap: 7px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .sidebar-link,
+  .sidebar-group-toggle,
+  .sidebar a {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 58px !important;
+    padding: 7px 3px !important;
+    border-radius: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: normal !important;
+    text-align: center !important;
+    font-size: 12px !important;
+    line-height: 1.22 !important;
+    overflow: hidden !important;
+  }
+
+  .nav-label {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    text-align: center !important;
+    white-space: normal !important;
+  }
+
+  .drag-handle,
+  .group-chevron {
+    display: none !important;
+  }
+
+  .sidebar-subnav {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    padding: 7px !important;
+    border: 1px solid #dceee6 !important;
+    border-radius: 14px !important;
+    background: #f7fcf9 !important;
+  }
+
+  .sidebar-sublink {
+    min-height: 48px !important;
+    font-size: 12px !important;
+  }
+
+  .sidebar-reset-sort {
+    width: fit-content !important;
+    max-width: 100% !important;
+    margin: 2px auto 0 !important;
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+
+  .main-content {
+    padding: 14px 10px calc(28px + env(safe-area-inset-bottom)) !important;
+    overflow-x: clip !important;
+  }
+
+  .page-title-row,
+  .page-header,
+  .library-header,
+  .tracking-top,
+  .points-title-row,
+  .toothbrush-title-row,
+  .status-title-row,
+  .wheel-header {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .page-title-row h1,
+  .page-title-row h2,
+  .page-header h1,
+  .page-header h2,
+  .library-header h1,
+  .library-header h2,
+  .wheel-header h1,
+  .wheel-header h2 {
+    font-size: clamp(25px, 8vw, 32px) !important;
+    line-height: 1.25 !important;
+  }
+
+  .page-title-row p,
+  .page-header p,
+  .library-header p,
+  .wheel-header p {
+    font-size: 15px !important;
+    line-height: 1.65 !important;
+  }
+
+  .card {
+    padding: 15px !important;
+    border-radius: 18px !important;
+  }
+
+  .home-grid,
+  .student-editor-grid,
+  .one-screen-layout,
+  .seat-layout-one-screen,
+  .points-layout,
+  .wheel-layout,
+  .calendar-shell,
+  .layout-grid,
+  .assignment-grid,
+  .summary,
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .actions,
+  .header-actions,
+  .points-tools,
+  .status-actions,
+  .date-controls,
+  .compact-date-controls,
+  .calendar-toolbar,
+  .toolbar-group,
+  .seat-toolbar,
+  .tracking-buttons,
+  .mode-switch {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .actions > *,
+  .header-actions > *,
+  .points-tools > *,
+  .status-actions > *,
+  .date-controls > *,
+  .compact-date-controls > *,
+  .tracking-buttons > * {
+    flex: 1 1 120px !important;
+  }
+
+  .add-row,
+  .schedule-row,
+  .assign-card-head,
+  .borrow-form,
+  .return-form,
+  .library-form,
+  .control-grid,
+  .wheel-controls {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .student-palette {
+    position: static !important;
+    max-height: none !important;
+    width: 100% !important;
+  }
+
+  .chips,
+  .assigned-list {
+    width: 100% !important;
+  }
+
+  .assignment-grid {
+    gap: 12px !important;
+  }
+
+  .assign-card {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* 月曆保留七欄，但每欄依螢幕等分，禁止固定 620px 寬度。 */
+  .calendar-page,
+  .calendar-shell,
+  .calendar-main,
+  .month-view,
+  .week-view,
+  .calendar-grid,
+  .week-grid,
+  .weekday-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .calendar-grid,
+  .weekday-row,
+  .week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  }
+
+  .calendar-day,
+  .day-cell,
+  .week-day,
+  .weekday {
+    min-width: 0 !important;
+    padding: 5px !important;
+  }
+
+  .calendar-day,
+  .day-cell {
+    min-height: 68px !important;
+  }
+
+  .calendar-day .date-number,
+  .day-cell .date-number,
+  .day-number {
+    font-size: 15px !important;
+  }
+
+  .calendar-day .event,
+  .day-cell .event,
+  .calendar-event,
+  .event-chip {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 2px 3px !important;
+    font-size: 9px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .detail-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* 座位圖在手機內縮放至可見，不再把整頁撐寬。 */
+  .seat-plan-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .seat-grid-map {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    gap: 5px !important;
+  }
+
+  .class-seat {
+    min-width: 0 !important;
+    min-height: 54px !important;
+    padding: 4px !important;
+    border-radius: 12px !important;
+    font-size: 11px !important;
+  }
+
+  /* 狀態頁在手機改為正常尺寸，避免超大數字被裁掉。 */
+  .status-hero {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 22px 14px !important;
+    overflow: hidden !important;
+  }
+
+  .status-clock,
+  .status-title-display {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .status-clock span {
+    font-size: clamp(24px, 10vw, 42px) !important;
+  }
+
+  .status-main-icon {
+    font-size: clamp(54px, 20vw, 86px) !important;
+  }
+
+  .status-hero h1 {
+    font-size: clamp(32px, 12vw, 52px) !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .status-hero p {
+    font-size: clamp(17px, 5vw, 23px) !important;
+  }
+
+  .rule-grid,
+  .tracking-grid,
+  .student-card-grid,
+  .students-grid,
+  .points-student-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* 轉盤與積分頁內所有大型區塊不得超過手機寬度。 */
+  .wheel-stage,
+  .wheel-wrap,
+  .wheel,
+  .points-panel,
+  .points-column,
+  .notebook-page,
+  .notebook-board,
+  .notebook-items,
+  .toothbrush-card,
+  .library-page,
+  .borrow-card {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .wheel-wrap {
+    width: min(82vw, 330px) !important;
+    height: min(82vw, 330px) !important;
+    margin-inline: auto !important;
+  }
+
+  .wheel {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .sidebar-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .sidebar-link,
+  .sidebar-group-toggle,
+  .sidebar a {
+    font-size: 11.5px !important;
+  }
+}
+
+
+/* ✅ HUA_POINTS_2_GLOBAL_MOTION_20260710：完成鼓勵視窗共用減少動態設定。 */
+@media (prefers-reduced-motion: reduce) {
+  .completion-reward-modal { animation: none !important; }
+}
+
+
+/* ✅ HUA_V21_SEL365_CLASS_REWARD_WEEK_SCROLL_20260710 */
+.completion-reward-actions { grid-template-columns: 1fr 1fr; }
+@media (max-width: 760px) {
+  .calendar-page .calendar-main { overflow-x: hidden !important; }
+  .calendar-page .week-scroll-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .calendar-page .week-scroll-area .week-view {
+    width: max-content !important;
+    max-width: none !important;
+    min-width: 700px !important;
+    grid-template-columns: repeat(7, 94px) !important;
+    overflow: visible !important;
+  }
+  .calendar-page .week-scroll-area .week-day { min-width: 94px !important; }
+  .completion-reward-actions { grid-template-columns: 1fr !important; }
+}

@@ -296,7 +296,9 @@ function removeEvent(index) {
           </button>
         </div>
 
-        <div v-else class="week-view">
+        <!-- ✅ HUA_MOBILE_WEEK_SCROLL_ONLY_20260710：手機僅週曆卡片區可左右滑動，頁面本身不橫向滑。 -->
+        <div v-else class="week-scroll-area" aria-label="週行事曆，可左右滑動查看七天">
+          <div class="week-view">
           <button
             v-for="(day, index) in weekDays"
             :key="day.key"
@@ -325,6 +327,7 @@ function removeEvent(index) {
               </span>
             </div>
           </button>
+          </div>
         </div>
       </main>
 
@@ -794,4 +797,158 @@ function removeEvent(index) {
 .day-cell.today .day-number { color: #14532d; }
 .week-day.selected h3 { color: #1f5c47; }
 
+
+/* ✅ HUA_CALENDAR_MOBILE_DESKTOP_REVIEW_20260710：桌機盡量一頁式，手機可美觀滑動並方便編輯。 */
+.calendar-main {
+  min-width: 0;
+}
+
+.detail-panel {
+  position: sticky;
+  top: 16px;
+}
+
+.calendar-shell.week .detail-panel {
+  position: static;
+}
+
+@media (min-width: 1101px) and (max-height: 760px) {
+  .calendar-header {
+    margin-bottom: 8px;
+  }
+
+  .calendar-header p {
+    font-size: 14px;
+  }
+
+  .calendar-main,
+  .detail-panel {
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .calendar-shell.month .calendar-main {
+    min-height: calc(100svh - 150px);
+  }
+
+  .month-view {
+    grid-template-rows: 26px;
+    grid-auto-rows: minmax(78px, 1fr);
+    gap: 6px;
+  }
+
+  .day-cell {
+    min-height: 78px;
+  }
+
+  .event-pill,
+  .more-pill {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .detail-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .calendar-page {
+    min-width: 0;
+  }
+
+  .calendar-header p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .mode-switch,
+  .calendar-toolbar {
+    width: 100%;
+  }
+
+  .mode-switch button {
+    flex: 1;
+  }
+
+  .calendar-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .calendar-toolbar strong {
+    flex: 1 1 100%;
+    order: -1;
+  }
+
+  .calendar-main {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .month-view {
+    min-width: 620px;
+  }
+
+  .week-view {
+    min-width: 620px;
+  }
+
+  .detail-panel {
+    padding: 14px;
+  }
+
+  .custom-event {
+    align-items: flex-start;
+  }
+
+  .custom-event span {
+    line-height: 1.5;
+  }
+
+  .add-row {
+    grid-template-columns: 1fr;
+  }
+
+  .add-row button {
+    width: 100%;
+  }
+}
+
+
+/* ✅ HUA_MOBILE_WEEK_SCROLL_ONLY_20260710 */
+.week-scroll-area { width: 100%; min-width: 0; }
+@media (max-width: 760px) {
+  .calendar-main { overflow-x: hidden !important; }
+  .month-view { min-width: 0 !important; }
+  .week-scroll-area {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 2px 10px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .week-scroll-area::-webkit-scrollbar { height: 6px; }
+  .week-scroll-area::-webkit-scrollbar-thumb { background: #cfe9dd; border-radius: 999px; }
+  .week-view {
+    width: max-content !important;
+    max-width: none !important;
+    min-width: 700px !important;
+    grid-template-columns: repeat(7, 94px) !important;
+    overflow: visible !important;
+  }
+  .week-day { min-width: 94px !important; min-height: 240px; }
+  .week-day.today::before {
+    content: "⭐ 今天";
+    display: block;
+    margin-bottom: 6px;
+    color: #2f6f57;
+    font-size: 12px;
+    font-weight: 950;
+  }
+}
 </style>

@@ -1,4 +1,6 @@
 <script setup>
+// ✅ HUA_POINTS_2_TOOTHBRUSH_INTEGRATION_20260710：全班潔牙完成會先慶祝，再由老師選擇是否全班 +1。
+// ✅ HUA_TOOTHBRUSH_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
 // CHECK_MARKER_20260707_NAME_CENTER_COMPACT: contains isTuesday + visibleStudents; completed cards auto-hide; centered compact student names.
 import { computed, reactive, ref, watch } from 'vue'
 
@@ -7,6 +9,119 @@ const selectedDate = ref(toDateKey(today))
 const toast = ref('')
 const audioEnabled = ref(localStorage.getItem('toothbrushSoundEnabled') !== 'false')
 const students = computed(() => (localStorage.getItem('students') || '').split('\n').map(name => name.trim()).filter(Boolean))
+function cleanStudentName(name = '') {
+  return String(name).replace(/^\s*(?:座號)?\d{1,2}[.、．)）\- ]+/, '').trim()
+}
+
+// ✅ HUA_COMPLETION_CLASS_ONLY_REWARD_20260710：全班完成後由老師決定是否加分，不自動發放。
+const COMPLETION_POINT_RECORDS_KEY = 'classAssistantPointRecordsV1'
+const COMPLETION_GROUPS_KEY = 'classHelperSeatGroupsForPoints'
+const completionRewardOpen = ref(false)
+const completionRewardSource = ref('')
+const completionRewardTitle = ref('')
+const completionRewardMessage = ref('')
+const completionRewardIcon = ref('🌟')
+const completionPrompted = reactive({})
+
+function parseCompletionStudent(line, index) {
+  const text = String(line || '').trim()
+  const match = text.match(/^(\d{1,2})[\s、.．,\-]+(.+)$/)
+  return match
+    ? { seatNo: Number(match[1]), name: match[2].trim(), key: `${Number(match[1])}__${match[2].trim()}` }
+    : { seatNo: index + 1, name: cleanStudentName(text), key: `${index + 1}__${cleanStudentName(text)}` }
+}
+
+const completionStudents = computed(() => students.value.map(parseCompletionStudent))
+
+
+function normalizedCompletionName(value) {
+  return String(value || '').replace(/^\s*(?:座號)?\d{1,2}[.、．)）\- ]+/, '').replace(/[\s　]/g, '').trim()
+}
+
+function loadCompletionPointRecords() {
+  try {
+    const data = JSON.parse(localStorage.getItem(COMPLETION_POINT_RECORDS_KEY) || '[]')
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+function playCompletionCelebrationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return
+    const ctx = new AudioContextClass()
+    const notes = [523.25, 659.25, 783.99, 1046.5]
+    notes.forEach((frequency, index) => {
+      const start = ctx.currentTime + index * 0.1
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(frequency, start)
+      gain.gain.setValueAtTime(0.001, start)
+      gain.gain.exponentialRampToValueAtTime(0.13, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(start)
+      osc.stop(start + 0.18)
+    })
+  } catch (error) {
+    console.warn('完成慶祝音效無法播放：', error)
+  }
+}
+
+function saveCompletionPoints(targetStudents, reason, type, extra = {}) {
+  const records = loadCompletionPointRecords()
+  const now = new Date().toISOString()
+  targetStudents.forEach((student, index) => {
+    records.push({
+      id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+      studentKey: student.key,
+      seatNo: student.seatNo,
+      name: student.name,
+      delta: 1,
+      reason,
+      note: '由全班完成鼓勵視窗發放',
+      type,
+      createdAt: now,
+      source: completionRewardSource.value,
+      ...extra
+    })
+  })
+  localStorage.setItem(COMPLETION_POINT_RECORDS_KEY, JSON.stringify(records))
+  window.dispatchEvent(new CustomEvent('class-helper-points-updated'))
+  playCompletionCelebrationSound()
+}
+
+function openCompletionReward({ source, title, message, icon = '🌟', promptKey }) {
+  if (completionPrompted[promptKey]) return
+  completionPrompted[promptKey] = true
+  completionRewardSource.value = source
+  completionRewardTitle.value = title
+  completionRewardMessage.value = message
+  completionRewardIcon.value = icon
+  playCompletionCelebrationSound()
+  setTimeout(() => { completionRewardOpen.value = true }, 650)
+}
+
+function closeCompletionReward() {
+  completionRewardOpen.value = false
+}
+
+function rewardWholeClass() {
+  if (!completionStudents.value.length) return
+  saveCompletionPoints(
+    completionStudents.value,
+    `${completionRewardTitle.value}｜全班完成`,
+    'completion-class'
+  )
+  showToast(`⭐ 已替全班 ${completionStudents.value.length} 位學生各加 1 分`, 2200)
+  closeCompletionReward()
+}
+
+
 const records = reactive(loadRecords())
 const weekdayNames = ['日', '一', '二', '三', '四', '五', '六']
 const selectedDateObject = computed(() => parseDateKey(selectedDate.value))
@@ -29,6 +144,21 @@ const remainingText = computed(() => students.value.length
 
 watch(records, () => localStorage.setItem('toothbrushRecords', JSON.stringify(records)), { deep: true })
 watch(audioEnabled, value => localStorage.setItem('toothbrushSoundEnabled', String(value)))
+
+watch([visibleStudents, selectedDate], ([visible]) => {
+  const promptKey = `toothbrush-${selectedDate.value}`
+  if (students.value.length > 0 && visible.length === 0) {
+    openCompletionReward({
+      source: 'toothbrush',
+      title: '全班潔牙完成！',
+      message: isTuesday.value ? '刷牙、漱口與桌面消毒都完成，準備香香地休息！' : '刷牙與桌面消毒都完成，準備香香地休息！',
+      icon: '🦷',
+      promptKey
+    })
+  } else {
+    completionPrompted[promptKey] = false
+  }
+}, { deep: true })
 
 function loadRecords() {
   try {
@@ -198,6 +328,22 @@ function showToast(message) {
         </article>
       </div>
     </section>
+
+    <div v-if="completionRewardOpen" class="completion-reward-overlay" @click.self="closeCompletionReward">
+      <section class="completion-reward-modal" role="dialog" aria-modal="true" aria-labelledby="completionRewardTitle">
+        <div class="completion-stars" aria-hidden="true">⭐ ✨ ⭐</div>
+        <div class="completion-icon">{{ completionRewardIcon }}</div>
+        <h3 id="completionRewardTitle">{{ completionRewardTitle }}</h3>
+        <p class="completion-message">{{ completionRewardMessage }}</p>
+        <p class="completion-thanks">謝謝大家一起讓班級變得更好。❤️</p>
+
+        <div class="completion-reward-actions">
+          <button type="button" class="reward-class-button" @click="rewardWholeClass">👍 全班 +1</button>
+          <button type="button" class="reward-skip-button" @click="closeCompletionReward">❤️ 今天不用</button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>
@@ -489,4 +635,90 @@ function showToast(message) {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ✅ HUA_TOOTHBRUSH_ONE_SCREEN_MOBILE_REVIEW_20260710
+   潔牙消毒：桌機 29 人盡量一頁式，手機兩欄好點擊、不切卡。 */
+@media (min-width: 981px) and (max-height: 820px) {
+  .toothbrush-page .card {
+    padding: 14px !important;
+  }
+
+  .tracking-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+  }
+
+  .toothbrush-card {
+    min-height: 78px !important;
+    padding: 10px !important;
+  }
+
+  .student-name {
+    font-size: 1.25rem !important;
+    margin-bottom: 7px !important;
+  }
+
+  .tracking-buttons button {
+    min-height: 32px !important;
+    padding: 5px 6px !important;
+    font-size: 0.86rem !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .tracking-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .student-name {
+    text-align: center !important;
+    padding: 0 !important;
+  }
+}
+
+
+/* ✅ HUA_POINTS_2_COMPLETION_REWARD_MODAL_20260710 */
+.completion-reward-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(36, 59, 83, .34);
+  backdrop-filter: blur(6px);
+}
+.completion-reward-modal {
+  width: min(460px, 94vw);
+  max-height: min(720px, 92svh);
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid #f2dfc9;
+  border-radius: 30px;
+  text-align: center;
+  background: linear-gradient(145deg, #fff, #fff9ee 58%, #f2fbf6);
+  box-shadow: 0 26px 80px rgba(36, 59, 83, .28);
+  animation: completionRewardPop .3s ease-out;
+}
+@keyframes completionRewardPop {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.completion-stars { font-size: 25px; letter-spacing: .16em; }
+.completion-icon { margin: 8px 0 2px; font-size: 62px; line-height: 1; }
+.completion-reward-modal h3 { margin: 8px 0; color: #2f6f57; font-size: 28px; }
+.completion-message { margin: 0; color: #465668; font-size: 18px; font-weight: 800; line-height: 1.65; }
+.completion-thanks { margin: 14px 0 20px; color: #8a5a44; font-weight: 900; }
+.completion-reward-actions { display: grid; gap: 10px; }
+.completion-reward-actions button { min-height: 48px; }
+.reward-class-button { background: #55b98a; }
+.reward-skip-button { background: #f6f3ef; color: #687386; border: 1px solid #e5e7eb; }
+@media (max-width: 520px) {
+  .completion-reward-overlay { align-items: end; padding: 10px; }
+  .completion-reward-modal { width: 100%; padding: 22px 16px calc(18px + env(safe-area-inset-bottom)); border-radius: 26px 26px 18px 18px; }
+  .completion-reward-modal h3 { font-size: 24px; }
+  .completion-icon { font-size: 52px; }
+}
+
 </style>

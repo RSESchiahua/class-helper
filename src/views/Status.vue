@@ -1,4 +1,5 @@
 <script setup>
+// ✅ HUA_STATUS_ONE_SCREEN_MOBILE_REVIEW_20260710：Status.vue 就是現在狀態／原 Modes 頁，已補桌機一頁式與手機可讀版面。
 // CONFIRM_STATUS_LINE_SPACING_20260707_2128
 // CONFIRM_STATUS_BALANCED_20260707_2058
 // CONFIRM_STATUS_ICONS_20260707_2115
@@ -92,7 +93,7 @@ function openFullscreen() { document.documentElement.requestFullscreen?.() }
       </div>
       <p>{{ statusView.message }}</p>
       <!-- CONFIRM_STATUS_LINE_SPACING_20260707_2128: 剩餘時間改成醒目的小徽章，行距略分開但維持一頁式 -->
-      <strong v-if="minutesLeft !== null" class="minutes-left">剩下 { minutesLeft } 分鐘</strong>
+      <strong v-if="minutesLeft !== null" class="minutes-left">剩下 {{ minutesLeft }} 分鐘</strong>
       <div class="rule-grid">
         <span v-for="rule in statusView.rules" :key="rule">{{ rule }}</span>
       </div>
@@ -859,6 +860,82 @@ function openFullscreen() { document.documentElement.requestFullscreen?.() }
   .status-page:not(.settings-open) .minutes-left,
   .status-page:not(.settings-open) .status-hero strong.minutes-left {
     padding: 5px 16px !important;
+  }
+}
+
+
+
+/* ✅ HUA_STATUS_ONE_SCREEN_MOBILE_REVIEW_20260710
+   現在狀態：桌機大螢幕維持一頁式；手機保留主訊息清楚可讀，設定區自然往下滑。 */
+@media (min-width: 981px) and (max-height: 820px) {
+  .status-page:not(.settings-open) {
+    height: calc(100svh - 92px) !important;
+    max-height: calc(100svh - 92px) !important;
+  }
+
+  .status-page:not(.settings-open) .status-hero.card,
+  .status-page:not(.settings-open) section.status-hero.card {
+    flex-basis: clamp(330px, 43svh, 400px) !important;
+    height: clamp(330px, 43svh, 400px) !important;
+    max-height: clamp(330px, 43svh, 400px) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .status-page,
+  .status-page:not(.settings-open) {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .status-title-row {
+    align-items: stretch !important;
+  }
+
+  .status-actions {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  .status-actions button {
+    flex: 1 1 140px;
+  }
+
+  .status-page:not(.settings-open) .status-hero.card,
+  .status-page:not(.settings-open) section.status-hero.card,
+  .status-hero {
+    height: auto !important;
+    max-height: none !important;
+    min-height: min(58svh, 430px) !important;
+    padding: 22px 16px !important;
+    overflow: visible !important;
+  }
+
+  .clock-time {
+    font-size: clamp(2.35rem, 13vw, 3.4rem) !important;
+  }
+
+  .status-title-display {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .status-hero h1,
+  .status-page:not(.settings-open) .status-hero h1 {
+    font-size: clamp(1.8rem, 9vw, 2.6rem) !important;
+    line-height: 1.14 !important;
+  }
+
+  .status-hero p,
+  .status-page:not(.settings-open) .status-hero p {
+    font-size: clamp(1rem, 4.5vw, 1.22rem) !important;
+    line-height: 1.55 !important;
+  }
+
+  .rule-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 

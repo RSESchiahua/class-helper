@@ -13,6 +13,7 @@ import Cleaning from '../views/Cleaning.vue'
 import Jobs from '../views/Jobs.vue'
 import Seats from '../views/Seats.vue'
 
+// ✅ HUA_STATUS_IS_MODES_ROUTE_CONFIRM_20260710：Status.vue 就是原本的 Modes／現在狀態頁，保留 /modes 自動轉址到 /status。
 // POINTS_ROUTE_20260707：新增獨立積分頁，班書借閱不納入積分。
 const routes = [
   { path: '/', component: Dashboard },

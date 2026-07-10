@@ -1,4 +1,5 @@
 <script setup>
+// ✅ HUA_CLEANING_ONE_SCREEN_MOBILE_REVIEW_20260710：打掃分配頁由全域 CSS 控制桌機一頁式與手機單欄。
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperCleaningAssignments'
@@ -60,6 +61,7 @@ function resetAssignments() {
 </script>
 
 <template>
+  <!-- ✅ HUA_CLEANING_ONE_SCREEN_MOBILE_REVIEW_20260710 -->
   <div class="page wide-page assign-page">
     <div class="page-title-row">
       <div>

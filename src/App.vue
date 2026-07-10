@@ -1,22 +1,31 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
+// ✅ HUA_SIDEBAR_GROUP_CLASS_AFFAIRS_20260710：班務分配改成可展開群組，避免左側功能列過滿。
 // SIDEBAR_DRAG_SORT_20260707：功能列只儲存顯示順序，不改變路由功能。
 const SIDEBAR_ORDER_KEY = 'classAssistantSidebarOrderV1'
+const CLASS_AFFAIRS_OPEN_KEY = 'classAssistantClassAffairsOpenV1'
+
+const route = useRoute()
 
 const defaultNavItems = [
   { key: 'dashboard', path: '/', label: '🏠 首頁' },
-  { key: 'students', path: '/students', label: '👨‍🎓 學生名單' },
+  { key: 'status', path: '/status', label: '🔔 現在狀態' },
   { key: 'notebook', path: '/notebook', label: '📚 簿本繳交' },
   { key: 'calendar', path: '/calendar', label: '🗓️ 行事曆' },
+  { key: 'students', path: '/students', label: '👨‍🎓 學生名單' },
   { key: 'toothbrush', path: '/toothbrush', label: '🦷 潔牙消毒' },
   { key: 'points', path: '/points', label: '⭐ 積分獎勵' },
   { key: 'library', path: '/library', label: '📖 班書借閱' },
-  { key: 'status', path: '/status', label: '🔔 現在狀態' },
+  { key: 'classAffairs', label: '🧩 班務分配', type: 'group' },
+  { key: 'wheel', path: '/wheel', label: '🎡 抽籤轉盤' }
+]
+
+const classAffairNavItems = [
   { key: 'cleaning', path: '/cleaning', label: '🧹 打掃分配' },
   { key: 'jobs', path: '/jobs', label: '⭐ 職務分配' },
-  { key: 'seats', path: '/seats', label: '🪑 座位安排' },
-  { key: 'wheel', path: '/wheel', label: '🎡 抽籤轉盤' }
+  { key: 'seats', path: '/seats', label: '🪑 座位安排' }
 ]
 
 const defaultOrder = defaultNavItems.map(item => item.key)
@@ -25,6 +34,8 @@ function loadSidebarOrder() {
   try {
     const saved = JSON.parse(localStorage.getItem(SIDEBAR_ORDER_KEY) || '[]')
     if (Array.isArray(saved)) {
+      const hasOldUngroupedClassAffairs = saved.some(key => ['cleaning', 'jobs', 'seats'].includes(key))
+      if (hasOldUngroupedClassAffairs) return []
       return saved.filter(key => defaultOrder.includes(key))
     }
   } catch (error) {
@@ -34,8 +45,13 @@ function loadSidebarOrder() {
   return []
 }
 
+function loadClassAffairsOpen() {
+  return localStorage.getItem(CLASS_AFFAIRS_OPEN_KEY) === 'true'
+}
+
 const showCredit = ref(false)
 const sidebarOrder = ref(loadSidebarOrder())
+const classAffairsOpen = ref(loadClassAffairsOpen())
 const draggedKey = ref('')
 let logoClickCount = 0
 let logoTimer = null
@@ -48,6 +64,18 @@ const orderedNavItems = computed(() => {
   const newItems = defaultNavItems.filter(item => !sidebarOrder.value.includes(item.key))
 
   return [...savedItems, ...newItems]
+})
+
+const isClassAffairsActive = computed(() => {
+  return classAffairNavItems.some(item => route.path.startsWith(item.path))
+})
+
+const showClassAffairsChildren = computed(() => {
+  return classAffairsOpen.value || isClassAffairsActive.value
+})
+
+watch(classAffairsOpen, value => {
+  localStorage.setItem(CLASS_AFFAIRS_OPEN_KEY, value ? 'true' : 'false')
 })
 
 function saveSidebarOrder(items = orderedNavItems.value) {
@@ -69,6 +97,10 @@ function handleLogoClick() {
   logoTimer = setTimeout(() => {
     logoClickCount = 0
   }, 1200)
+}
+
+function toggleClassAffairs() {
+  classAffairsOpen.value = !classAffairsOpen.value
 }
 
 function handleNavDragStart(event, key) {
@@ -96,6 +128,7 @@ function handleNavDrop(event, targetKey) {
 
 function resetSidebarOrder() {
   sidebarOrder.value = [...defaultOrder]
+  classAffairsOpen.value = false
   localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(defaultOrder))
 }
 </script>
@@ -108,23 +141,61 @@ function resetSidebarOrder() {
         <span class="sidebar-subtitle">每天快一點，班級暖一點</span>
       </button>
 
-      <!-- SIDEBAR_DRAG_SORT_20260707 -->
+      <!-- ✅ HUA_SIDEBAR_GROUP_CLASS_AFFAIRS_20260710 -->
       <nav class="sidebar-nav" aria-label="主要功能，可拖曳排序">
-        <RouterLink
-          v-for="item in orderedNavItems"
-          :key="item.key"
-          class="sidebar-link"
-          :class="{ dragging: draggedKey === item.key }"
-          :to="item.path"
-          draggable="true"
-          @dragstart="handleNavDragStart($event, item.key)"
-          @dragover.prevent
-          @drop.prevent="handleNavDrop($event, item.key)"
-          @dragend="draggedKey = ''"
-        >
-          <span class="nav-label">{{ item.label }}</span>
-          <span class="drag-handle" aria-hidden="true">⋮⋮</span>
-        </RouterLink>
+        <template v-for="item in orderedNavItems" :key="item.key">
+          <button
+            v-if="item.type === 'group'"
+            type="button"
+            class="sidebar-link sidebar-group-toggle"
+            :class="{
+              active: isClassAffairsActive,
+              expanded: showClassAffairsChildren,
+              dragging: draggedKey === item.key
+            }"
+            draggable="true"
+            :aria-expanded="showClassAffairsChildren"
+            @click="toggleClassAffairs"
+            @dragstart="handleNavDragStart($event, item.key)"
+            @dragover.prevent
+            @drop.prevent="handleNavDrop($event, item.key)"
+            @dragend="draggedKey = ''"
+          >
+            <span class="nav-label">{{ item.label }}</span>
+            <span class="group-chevron" aria-hidden="true">{{ showClassAffairsChildren ? '⌄' : '›' }}</span>
+            <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+          </button>
+
+          <RouterLink
+            v-else
+            class="sidebar-link"
+            :class="{ dragging: draggedKey === item.key }"
+            :to="item.path"
+            draggable="true"
+            @dragstart="handleNavDragStart($event, item.key)"
+            @dragover.prevent
+            @drop.prevent="handleNavDrop($event, item.key)"
+            @dragend="draggedKey = ''"
+          >
+            <span class="nav-label">{{ item.label }}</span>
+            <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+          </RouterLink>
+
+          <div
+            v-if="item.key === 'classAffairs' && showClassAffairsChildren"
+            class="sidebar-subnav"
+            aria-label="班務分配子功能"
+          >
+            <RouterLink
+              v-for="child in classAffairNavItems"
+              :key="child.key"
+              class="sidebar-link sidebar-sublink"
+              :to="child.path"
+            >
+              <span class="nav-label">{{ child.label }}</span>
+            </RouterLink>
+          </div>
+        </template>
       </nav>
 
       <button class="sidebar-reset-sort" type="button" @click="resetSidebarOrder">
