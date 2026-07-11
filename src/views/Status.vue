@@ -1,942 +1,759 @@
 <script setup>
-// ✅ HUA_STATUS_ONE_SCREEN_MOBILE_REVIEW_20260710：Status.vue 就是現在狀態／原 Modes 頁，已補桌機一頁式與手機可讀版面。
-// CONFIRM_STATUS_LINE_SPACING_20260707_2128
-// CONFIRM_STATUS_BALANCED_20260707_2058
-// CONFIRM_STATUS_ICONS_20260707_2115
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+// ✅ HUA_STATUS_SUBJECT_PRESET_ICON_LINK_20260711：現在狀態沿用課表科目工具盤的科目名稱與圖示，並支援半天課與自訂時段。
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
-const STORAGE_KEY = 'classHelperStatusSchedule'
+const STORAGE_KEY = 'classHelperWeeklyScheduleV1'
+const router = useRouter()
+
+const days = [
+  { key: 'mon', dayIndex: 1, label: '週一' },
+  { key: 'tue', dayIndex: 2, label: '週二' },
+  { key: 'wed', dayIndex: 3, label: '週三' },
+  { key: 'thu', dayIndex: 4, label: '週四' },
+  { key: 'fri', dayIndex: 5, label: '週五' }
+]
+
+const defaultPeriods = [
+  { id: 'morning', label: '早修', kind: 'morning', start: '07:50', end: '08:35' },
+  { id: 'cleaning-am', label: '上午打掃', kind: 'cleaning', start: '08:35', end: '08:40' },
+  { id: 'p1', label: '第一節', kind: 'class', start: '08:40', end: '09:20' },
+  { id: 'p2', label: '第二節', kind: 'class', start: '09:30', end: '10:10' },
+  { id: 'p3', label: '第三節', kind: 'class', start: '10:30', end: '11:10' },
+  { id: 'p4', label: '第四節', kind: 'class', start: '11:20', end: '12:00' },
+  { id: 'lunch', label: '午餐／午休', kind: 'lunch', start: '12:00', end: '13:20' },
+  { id: 'p5', label: '第五節', kind: 'class', start: '13:30', end: '14:10' },
+  { id: 'p6', label: '第六節', kind: 'class', start: '14:20', end: '15:00' },
+  { id: 'cleaning-pm', label: '下午打掃', kind: 'cleaning', start: '15:00', end: '15:20' },
+  { id: 'p7', label: '第七節', kind: 'class', start: '15:20', end: '16:00' }
+]
+
+const validKinds = new Set(['morning', 'class', 'recess', 'cleaning', 'lunch', 'assembly', 'other'])
+const kindDefaults = {
+  morning: { subject: '早修', icon: '🌞', message: '請安靜進教室，完成早修任務與作業繳交。' },
+  class: { subject: '', icon: '📖', message: '' },
+  recess: { subject: '下課時間', icon: '🔔', message: '請完成喝水、上廁所與下節課準備。' },
+  cleaning: { subject: '打掃', icon: '🧹', message: '請到自己的打掃區，完成整理後請幹部檢查。' },
+  lunch: { subject: '午餐／午休', icon: '🌙', message: '用餐後整理座位，午休時間保持安靜。' },
+  assembly: { subject: '集合時間', icon: '📣', message: '請依老師指示安靜集合。' },
+  other: { subject: '', icon: '🌿', message: '' }
+}
+
+
+const subjectIconMap = {
+  國語: '📖',
+  數學: '🔢',
+  社會: '🌏',
+  自然: '🔬',
+  本土語: '🗣️',
+  綜合: '🧩',
+  生活: '🌱',
+  健康: '💚',
+  體育: '🏃',
+  資訊: '💻',
+  音樂: '🎵',
+  美勞: '🎨',
+  英語: '🔤',
+  彈性: '🌿',
+  校本課程: '🏫'
+}
+
+function defaultEntry(kind) {
+  return { ...(kindDefaults[kind] || kindDefaults.other) }
+}
+
+function makeDefaultData() {
+  const weekdays = {}
+  days.forEach(day => {
+    weekdays[day.key] = {}
+    defaultPeriods.forEach(period => {
+      weekdays[day.key][period.id] = defaultEntry(period.kind)
+    })
+  })
+
+  return {
+    version: 2,
+    periods: defaultPeriods.map(period => ({ ...period })),
+    weekdays,
+    halfDayCutoffs: Object.fromEntries(days.map(day => [day.key, null]))
+  }
+}
+
+function normalizeData(raw) {
+  const fallback = makeDefaultData()
+  if (!raw || !Array.isArray(raw.periods) || !raw.periods.length || !raw.weekdays) return fallback
+
+  const usedIds = new Set()
+  const periods = raw.periods.map((period, index) => {
+    let id = String(period?.id || `period-${index + 1}`)
+    while (usedIds.has(id)) id = `${id}-${index + 1}`
+    usedIds.add(id)
+    const kind = validKinds.has(period?.kind) ? period.kind : 'other'
+    return {
+      id,
+      label: String(period?.label || `時段 ${index + 1}`),
+      kind,
+      start: String(period?.start || '08:00'),
+      end: String(period?.end || '08:40')
+    }
+  })
+
+  const weekdays = {}
+  days.forEach(day => {
+    weekdays[day.key] = {}
+    periods.forEach(period => {
+      const saved = raw.weekdays?.[day.key]?.[period.id]
+      weekdays[day.key][period.id] = saved && typeof saved === 'object'
+        ? { ...defaultEntry(period.kind), ...saved }
+        : defaultEntry(period.kind)
+    })
+  })
+
+  const validIds = new Set(periods.map(period => period.id))
+  const halfDayCutoffs = {}
+  days.forEach(day => {
+    const cutoff = raw.halfDayCutoffs?.[day.key]
+    halfDayCutoffs[day.key] = validIds.has(cutoff) ? cutoff : null
+  })
+
+  return { version: 2, periods, weekdays, halfDayCutoffs }
+}
+
+function migrateLegacySchedule() {
+  let legacy
+  try {
+    legacy = JSON.parse(localStorage.getItem('classHelperStatusSchedule') || 'null')
+  } catch {
+    return null
+  }
+  if (!Array.isArray(legacy) || !legacy.length) return null
+
+  const migrated = makeDefaultData()
+  const matchers = [
+    ['morning', item => item.type === 'morning'],
+    ['p1', item => String(item.title || '').includes('第一節')],
+    ['p2', item => String(item.title || '').includes('第二節')],
+    ['p3', item => String(item.title || '').includes('第三節')],
+    ['p4', item => String(item.title || '').includes('第四節')],
+    ['p5', item => String(item.title || '').includes('第五節')],
+    ['p6', item => String(item.title || '').includes('第六節')],
+    ['p7', item => String(item.title || '').includes('第七節')],
+    ['lunch', item => String(item.title || '').includes('午休') || String(item.title || '').includes('午餐')],
+    ['cleaning-pm', item => item.type === 'cleaning']
+  ]
+
+  matchers.forEach(([periodId, matcher]) => {
+    const oldPeriod = legacy.find(matcher)
+    const period = migrated.periods.find(item => item.id === periodId)
+    if (!oldPeriod || !period) return
+    if (oldPeriod.start) period.start = oldPeriod.start
+    if (oldPeriod.end) period.end = oldPeriod.end
+
+    days.forEach(day => {
+      const entry = migrated.weekdays[day.key][periodId]
+      if (oldPeriod.message) entry.message = oldPeriod.message
+    })
+  })
+
+  return migrated
+}
+
+function loadSchedule() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) return normalizeData(JSON.parse(saved))
+
+    const migrated = migrateLegacySchedule()
+    if (migrated) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+      return migrated
+    }
+
+    return makeDefaultData()
+  } catch (error) {
+    console.warn('課表資料讀取失敗，已使用預設作息。', error)
+    return makeDefaultData()
+  }
+}
+
 const now = ref(new Date())
+const scheduleData = ref(loadSchedule())
 const customNow = ref('')
-const schedule = ref(loadSchedule())
-const isSettingsOpen = ref(false)
-const compactHeroStyle = computed(() => ({
-  height: 'min(620px, calc(100dvh - 220px))',
-  maxHeight: 'min(620px, calc(100dvh - 220px))',
-  minHeight: '0',
-  flex: '0 0 min(620px, calc(100dvh - 220px))',
-  overflow: 'hidden',
-  boxSizing: 'border-box'
-}))
+const customDay = ref('')
+const showTestTools = ref(false)
 let timer = null
 
-watch(schedule, value => localStorage.setItem(STORAGE_KEY, JSON.stringify(value)), { deep: true })
-
-onMounted(() => { timer = setInterval(() => { now.value = new Date() }, 1000) })
-onUnmounted(() => clearInterval(timer))
-
-const timeSource = computed(() => customNow.value ? timeToMinutes(customNow.value) : now.value.getHours() * 60 + now.value.getMinutes())
-const realTimeText = computed(() => now.value.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }))
-const displayTimeText = computed(() => customNow.value ? `${customNow.value}:00` : realTimeText.value)
-const currentPeriod = computed(() => {
-  const m = timeSource.value
-  return schedule.value.find(item => m >= timeToMinutes(item.start) && m < timeToMinutes(item.end)) || { type: 'other', title: '彈性時間', start: '', end: '', message: '請看老師指示，安靜完成現在的任務。' }
-})
-const minutesLeft = computed(() => currentPeriod.value.end ? Math.max(0, timeToMinutes(currentPeriod.value.end) - timeSource.value) : null)
-const isRecessEnding = computed(() => currentPeriod.value.type === 'recess' && minutesLeft.value !== null && minutesLeft.value <= 2)
-const statusView = computed(() => {
-  if (isRecessEnding.value) return { icon: '⏰', title: '準備上課', message: '倒數兩分鐘，請收心、收拾物品，回座位坐好。', rules: ['喝水上廁所結束', '拿出下節課用品', '安靜回座位', '等待老師或科任老師'] }
-  const map = {
-    morning: ['🌞', '早修時間', ['安靜進教室', '交作業與聯絡簿', '完成早修任務', '不聊天、不走動']],
-    class: ['📖', '上課時間', ['專心聽講', '需要發言請舉手', '準備好課本用品', '尊重正在說話的人']],
-    recess: ['🔔', '下課時間', ['收拾桌面', '靠好椅子', '上廁所、裝水', '注意安全']],
-    cleaning: ['🧹', '打掃時間', ['拿掃具', '完成負責區域', '掃具歸位', '請衛生長檢查']],
-    dismissal: ['🎒', '放學時間', ['整理書包', '椅子靠好', '檢查抽屜地面', '依路隊安靜離開']],
-    other: ['🌿', '彈性時間', ['看老師指示', '保持安靜', '完成手邊任務']]
-  }
-  const [icon, fallbackTitle, rules] = map[currentPeriod.value.type] || map.other
-  return { icon, title: currentPeriod.value.title || fallbackTitle, message: currentPeriod.value.message, rules }
-})
-function loadSchedule() {
-  try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); if (Array.isArray(saved) && saved.length) return saved } catch {}
-  return [
-    { type: 'morning', title: '早修時間', start: '07:50', end: '08:35', message: '請安靜進入教室，完成早修與交作業。' },
-    { type: 'class', title: '第一節上課', start: '08:40', end: '09:20', message: '進入上課狀態，準備好課本用品。' },
-    { type: 'recess', title: '第一節下課', start: '09:20', end: '09:30', message: '下課活動，記得上廁所與裝水。' },
-    { type: 'class', title: '第二節上課', start: '09:30', end: '10:10', message: '請回座位，專心上課。' },
-    { type: 'recess', title: '第二節下課', start: '10:10', end: '10:20', message: '下課活動，倒數兩分鐘會提醒回座位。' },
-    { type: 'cleaning', title: '打掃時間', start: '15:10', end: '15:25', message: '請到自己的打掃區，快速完成整理。' },
-    { type: 'dismissal', title: '放學時間', start: '15:50', end: '16:10', message: '整理書包與座位，準備放學。' }
-  ]
+function refreshSchedule() {
+  scheduleData.value = loadSchedule()
 }
-function timeToMinutes(time) { const [h, m] = time.split(':').map(Number); return h * 60 + m }
-function addPeriod() { schedule.value.push({ type: 'class', title: '新增時段', start: '08:00', end: '08:40', message: '' }) }
-function removePeriod(index) { schedule.value.splice(index, 1) }
-function openFullscreen() { document.documentElement.requestFullscreen?.() }
+
+function handleVisibilityChange() {
+  if (!document.hidden) refreshSchedule()
+}
+
+onMounted(() => {
+  timer = window.setInterval(() => { now.value = new Date() }, 1000)
+  window.addEventListener('storage', refreshSchedule)
+  window.addEventListener('focus', refreshSchedule)
+  window.addEventListener('class-helper-schedule-updated', refreshSchedule)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  window.clearInterval(timer)
+  window.removeEventListener('storage', refreshSchedule)
+  window.removeEventListener('focus', refreshSchedule)
+  window.removeEventListener('class-helper-schedule-updated', refreshSchedule)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
+
+const timeSource = computed(() => {
+  if (customNow.value) return toMinutes(customNow.value)
+  return now.value.getHours() * 60 + now.value.getMinutes()
+})
+
+const displayTimeText = computed(() => {
+  if (customNow.value) return `${customNow.value}:00`
+  return now.value.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+})
+
+const activeDayIndex = computed(() => customDay.value ? Number(customDay.value) : now.value.getDay())
+const activeDay = computed(() => days.find(day => day.dayIndex === activeDayIndex.value) || null)
+const activeDayLabel = computed(() => activeDay.value?.label || (activeDayIndex.value === 0 ? '週日' : '週六'))
+const activeDayIsHalfDay = computed(() => Boolean(activeDay.value && scheduleData.value.halfDayCutoffs?.[activeDay.value.key]))
+
+function visiblePeriodsForDay(dayKey) {
+  const periods = scheduleData.value.periods || []
+  const cutoffId = scheduleData.value.halfDayCutoffs?.[dayKey]
+  if (!cutoffId) return periods
+  const cutoffIndex = periods.findIndex(period => period.id === cutoffId)
+  if (cutoffIndex < 0) return periods
+  return periods.slice(0, cutoffIndex + 1)
+}
+
+const activePeriods = computed(() => {
+  if (!activeDay.value) return []
+  return [...visiblePeriodsForDay(activeDay.value.key)].sort((a, b) => toMinutes(a.start) - toMinutes(b.start))
+})
+
+const currentStatus = computed(() => {
+  if (!activeDay.value) {
+    return {
+      mode: 'weekend', kind: 'other', icon: '🌿', title: '非平日課表', periodLabel: '週末',
+      message: '今天沒有套用週一至週五課表，請看老師指示。', minutesLeft: null, next: null
+    }
+  }
+
+  const periods = activePeriods.value
+  const minute = timeSource.value
+  const dayEntries = scheduleData.value.weekdays[activeDay.value.key] || {}
+
+  if (!periods.length) {
+    return {
+      mode: 'after', kind: 'other', icon: '🌿', title: '尚未設定作息', periodLabel: activeDay.value.label,
+      message: '請到「課表與作息」新增今天要使用的時段。', minutesLeft: null, next: null
+    }
+  }
+
+  const activeIndex = periods.findIndex(period => minute >= toMinutes(period.start) && minute < toMinutes(period.end))
+  if (activeIndex >= 0) {
+    const period = periods[activeIndex]
+    const entry = dayEntries[period.id] || defaultEntry(period.kind)
+    const title = entry.subject?.trim() || period.label
+    return {
+      mode: 'active', kind: period.kind,
+      icon: entryDisplayIcon(entry, period.kind),
+      title,
+      periodLabel: `${period.label}・${period.start}–${period.end}`,
+      message: entry.message?.trim() || defaultMessage(period.kind, title),
+      minutesLeft: Math.max(0, toMinutes(period.end) - minute),
+      next: makeNextInfo(periods[activeIndex + 1], dayEntries)
+    }
+  }
+
+  const nextIndex = periods.findIndex(period => minute < toMinutes(period.start))
+  if (nextIndex === 0) {
+    const next = makeNextInfo(periods[0], dayEntries)
+    return {
+      mode: 'before', kind: 'other', icon: '🌿', title: '到校準備',
+      periodLabel: `${activeDay.value.label}課表尚未開始`,
+      message: `第一個時段是${next.title}，請先完成到校準備。`,
+      minutesLeft: Math.max(0, toMinutes(periods[0].start) - minute), next
+    }
+  }
+
+  if (nextIndex > 0) {
+    const nextPeriod = periods[nextIndex]
+    const next = makeNextInfo(nextPeriod, dayEntries)
+    const minutesLeft = Math.max(0, toMinutes(nextPeriod.start) - minute)
+    const warning = minutesLeft <= 2
+    return {
+      mode: 'gap', kind: 'recess', icon: warning ? '⏰' : '🔔',
+      title: warning ? '準備上課' : '下課時間',
+      periodLabel: `下一個時段 ${nextPeriod.start} 開始`,
+      message: warning
+        ? `倒數兩分鐘，下一個是${next.title}，請收拾物品並回座位。`
+        : `下一個是${next.title}，請在 ${nextPeriod.start} 前完成下課活動。`,
+      minutesLeft, next
+    }
+  }
+
+  return {
+    mode: 'after', kind: 'dismissal', icon: '🎒', title: '放學時間',
+    periodLabel: `${activeDay.value.label}${activeDayIsHalfDay.value ? '半天課' : '課表'}已結束`,
+    message: `${activeDayIsHalfDay.value ? '今天是半天課，' : ''}整理書包、桌面與抽屜，依老師指示準備放學。`,
+    minutesLeft: null, next: null
+  }
+})
+
+const isTransitionWarning = computed(() => {
+  return ['gap', 'before'].includes(currentStatus.value.mode)
+    && currentStatus.value.minutesLeft !== null
+    && currentStatus.value.minutesLeft <= 2
+})
+
+const statusRules = computed(() => {
+  if (isTransitionWarning.value) {
+    return ['結束喝水與上廁所', '拿出下節課用品', '安靜回到座位', '等待老師開始上課']
+  }
+
+  const rules = {
+    morning: ['安靜進教室', '繳交作業與聯絡簿', '完成早修任務', '準備今天的學習'],
+    class: ['專心聽講', '發言前先舉手', '備妥課本用品', '尊重正在說話的人'],
+    recess: ['收拾桌面', '椅子靠好', '上廁所與裝水', '活動時注意安全'],
+    cleaning: ['拿取掃具', '完成負責區域', '掃具正確歸位', '請幹部完成檢查'],
+    lunch: ['安靜用餐', '整理桌面與餐具', '完成午間工作', '午休保持安靜'],
+    assembly: ['安靜整隊', '依序前往', '專心聆聽', '遵守集合秩序'],
+    dismissal: ['整理書包', '檢查抽屜與地面', '椅子靠好', '依路隊安靜離開'],
+    other: ['看老師指示', '保持安靜', '完成手邊任務', '準備下一個活動']
+  }
+
+  return rules[currentStatus.value.kind] || rules.other
+})
+
+
+function entryDisplayIcon(entry, kind) {
+  const subject = entry?.subject?.trim()
+  const presetIcon = subjectIconMap[subject]
+  if (kind === 'class' && presetIcon && (!entry?.icon?.trim() || entry.icon.trim() === '📖')) return presetIcon
+  return entry?.icon?.trim() || defaultIcon(kind)
+}
+
+function makeNextInfo(period, dayEntries) {
+  if (!period) return null
+  const entry = dayEntries[period.id] || defaultEntry(period.kind)
+  return {
+    periodLabel: period.label,
+    title: entry.subject?.trim() || period.label,
+    icon: entryDisplayIcon(entry, period.kind),
+    start: period.start
+  }
+}
+
+function defaultIcon(kind) {
+  return defaultEntry(kind).icon || '🌿'
+}
+
+function defaultMessage(kind, title) {
+  const messages = {
+    morning: '請安靜進教室，完成早修任務與作業繳交。',
+    class: `現在是${title}，請準備好課本用品並專心上課。`,
+    recess: '請完成喝水、上廁所與下節課準備。',
+    cleaning: '請到自己的打掃區，完成整理後請幹部檢查。',
+    lunch: '用餐後整理座位，午休時間保持安靜。',
+    assembly: '請依老師指示安靜集合。',
+    other: '請看老師指示，完成現在的任務。'
+  }
+  return messages[kind] || messages.other
+}
+
+function toMinutes(time) {
+  const [hour, minute] = String(time || '00:00').split(':').map(Number)
+  return hour * 60 + minute
+}
+
+function resetTestTime() {
+  customNow.value = ''
+  customDay.value = ''
+}
+
+function openFullscreen() {
+  document.documentElement.requestFullscreen?.()
+}
 </script>
 
 <template>
-  <!-- CONFIRM_STATUS_BALANCED_20260707_2058: status white card is controlled by inline compactHeroStyle -->
-  <div class="page wide-page status-page" :class="{ 'settings-open': isSettingsOpen }">
-    <div class="page-title-row status-title-row">
+  <div class="page wide-page linked-status-page">
+    <div class="page-title-row linked-status-title-row">
       <div>
         <h2>🔔 現在狀態</h2>
-        <p v-if="isSettingsOpen">依照目前時間自動切換早修、上課、下課、打掃、放學。</p>
+        <p>{{ activeDayLabel }}<span v-if="activeDayIsHalfDay">・半天課</span>・依「課表與作息」自動切換</p>
       </div>
-      <div class="status-actions">
-        <button class="gear-button" :class="{ active: isSettingsOpen }" @click="isSettingsOpen = !isSettingsOpen">
-          ⚙️ 作息設定
-        </button>
-        <button @click="openFullscreen">全螢幕</button>
+      <div class="linked-status-actions">
+        <button type="button" class="status-soft-button" @click="router.push('/schedule')">📅 課表設定</button>
+        <button type="button" class="status-soft-button" :class="{ active: showTestTools }" @click="showTestTools = !showTestTools">🧪 測試</button>
+        <button type="button" @click="openFullscreen">全螢幕</button>
       </div>
     </div>
 
-    <section class="status-hero card" :class="{ warning: isRecessEnding }" :style="!isSettingsOpen ? compactHeroStyle : undefined">
-      <div class="status-clock">
-        <span class="clock-label">現在時間</span>
-        <span class="clock-time">{{ displayTimeText }}</span>
-      </div>
-      <!-- CONFIRM_STATUS_ICONS_20260707_2115: 各作息代表圖示顯示在狀態標題旁，不再只當浮水印 -->
-      <div class="status-title-display">
-        <span class="status-main-icon" aria-hidden="true">{{ statusView.icon }}</span>
-        <h1>{{ statusView.title }}</h1>
-      </div>
-      <p>{{ statusView.message }}</p>
-      <!-- CONFIRM_STATUS_LINE_SPACING_20260707_2128: 剩餘時間改成醒目的小徽章，行距略分開但維持一頁式 -->
-      <strong v-if="minutesLeft !== null" class="minutes-left">剩下 {{ minutesLeft }} 分鐘</strong>
-      <div class="rule-grid">
-        <span v-for="rule in statusView.rules" :key="rule">{{ rule }}</span>
-      </div>
+    <section v-if="showTestTools" class="status-test-panel card compact-card">
+      <label>
+        <span>測試星期</span>
+        <select v-model="customDay">
+          <option value="">今天</option>
+          <option v-for="day in days" :key="day.key" :value="String(day.dayIndex)">{{ day.label }}</option>
+        </select>
+      </label>
+      <label>
+        <span>測試時間</span>
+        <input v-model="customNow" type="time" />
+      </label>
+      <button type="button" class="status-soft-button" @click="resetTestTime">恢復現在時間</button>
     </section>
 
-    <section v-if="isSettingsOpen" class="card compact-card schedule-editor">
-      <div class="section-head">
+    <section class="linked-status-hero card" :class="{ warning: isTransitionWarning }">
+      <div class="linked-status-clock">
+        <span>現在時間</span>
+        <strong>{{ displayTimeText }}</strong>
+      </div>
+
+      <div class="linked-status-main">
+        <span class="linked-status-icon" aria-hidden="true">{{ currentStatus.icon }}</span>
         <div>
-          <h3>⚙️ 作息時間設定</h3>
-          <p>每間學校作息不同，老師可在這裡自行調整時間與提醒文字。</p>
+          <small>{{ currentStatus.periodLabel }}</small>
+          <h1>{{ currentStatus.title }}</h1>
         </div>
-        <button @click="addPeriod">＋ 新增時段</button>
       </div>
 
-      <div class="test-time-row">
-        <label for="status-custom-now">測試目前時間</label>
-        <input id="status-custom-now" v-model="customNow" type="time" title="測試或手動指定目前時間" />
-        <button @click="customNow = ''">用現在時間</button>
+      <p class="linked-status-message">{{ currentStatus.message }}</p>
+
+      <div class="status-info-row">
+        <strong v-if="currentStatus.minutesLeft !== null" class="minutes-left-badge">
+          剩下 {{ currentStatus.minutesLeft }} 分鐘
+        </strong>
+        <span v-if="currentStatus.next && currentStatus.mode === 'active'" class="next-period-badge">
+          下一個：{{ currentStatus.next.icon }} {{ currentStatus.next.title }}・{{ currentStatus.next.start }}
+        </span>
       </div>
 
-      <div class="schedule-table">
-        <div v-for="(item, index) in schedule" :key="index" class="schedule-row">
-          <select v-model="item.type">
-            <option value="morning">早修</option>
-            <option value="class">上課</option>
-            <option value="recess">下課</option>
-            <option value="cleaning">打掃</option>
-            <option value="dismissal">放學</option>
-            <option value="other">其他</option>
-          </select>
-          <input v-model="item.title" placeholder="畫面標題" />
-          <input v-model="item.start" type="time" />
-          <input v-model="item.end" type="time" />
-          <input v-model="item.message" placeholder="給學生看的提醒" />
-          <button class="tiny danger-text" @click="removePeriod(index)">刪除</button>
-        </div>
+      <div class="linked-rule-grid">
+        <span v-for="rule in statusRules" :key="rule">{{ rule }}</span>
       </div>
     </section>
   </div>
 </template>
 
 <style scoped>
-.status-page {
+.linked-status-page {
+  height: calc(100dvh - 56px);
+  min-height: 620px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-height: calc(100vh - 120px);
-}
-
-/* 設定收起時：整個狀態頁鎖在畫面內，不讓大白框撐出捲軸 */
-.status-page:not(.settings-open) {
-  min-height: 0 !important;
-  height: calc(100dvh - 108px) !important;
-  max-height: calc(100dvh - 108px) !important;
-  overflow: hidden !important;
-}
-
-.status-title-row {
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 0 !important;
-  flex: 0 0 auto;
-}
-
-.status-title-row h2 {
-  margin: 0;
-  line-height: 1.15;
-}
-
-.status-title-row p {
-  margin: 4px 0 0;
-}
-
-.status-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.gear-button {
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.gear-button.active {
-  transform: translateY(1px);
-  filter: brightness(0.97);
-}
-
-.status-hero {
-  position: relative;
-  flex: 0 0 auto;
-  min-height: 0;
-  height: clamp(390px, 46dvh, 430px);
-  max-height: clamp(390px, 46dvh, 430px);
-  padding: clamp(10px, 1.5vw, 18px) clamp(18px, 2.6vw, 32px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 5px;
+  gap: 12px;
   overflow: hidden;
-  box-sizing: border-box;
 }
 
-/* 2026-07-07 status hero final-fit: 大白框高度改為受控一頁式 */
-.status-page:not(.settings-open) .status-hero.card,
-.status-page:not(.settings-open) section.status-hero.card {
-  flex: 0 0 clamp(390px, 46dvh, 430px) !important;
-  height: clamp(390px, 46dvh, 430px) !important;
-  min-height: 0 !important;
-  max-height: clamp(390px, 46dvh, 430px) !important;
-  padding: 12px 26px 14px !important;
-  gap: 5px !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
+.linked-status-title-row {
+  flex: 0 0 auto;
+  align-items: center;
+  margin-bottom: 0;
 }
 
-.status-page.settings-open .status-hero {
-  height: auto;
-  max-height: none;
-  min-height: 430px;
+.linked-status-title-row p {
+  margin-top: 4px;
 }
 
-.status-clock {
+.linked-status-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-soft-button {
+  background: #f3faf6;
+  color: #2f6f57;
+  border: 1px solid #cfe9dd;
+}
+
+.status-soft-button.active {
+  background: #dff3ea;
+}
+
+.status-test-panel {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.status-test-panel label {
+  display: grid;
+  gap: 5px;
+  color: #53665d;
+  font-weight: 900;
+}
+
+.status-test-panel input,
+.status-test-panel select {
+  min-width: 150px;
+  border: 2px solid #dceee6;
+  border-radius: 13px;
+  padding: 9px 11px;
+  background: white;
+  font: inherit;
+}
+
+.linked-status-hero {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
+  padding: clamp(18px, 2.4vw, 30px);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
+  gap: clamp(10px, 1.5vh, 16px);
+  text-align: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ffffff 0%, #f5fbf8 58%, #fffaf2 100%);
+}
+
+.linked-status-hero.warning {
+  background: linear-gradient(135deg, #fff8e8 0%, #fff0ed 100%);
+  animation: linkedStatusPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes linkedStatusPulse {
+  from { box-shadow: 0 8px 24px rgba(0, 0, 0, .08); }
+  to { box-shadow: 0 10px 34px rgba(230, 137, 126, .24); }
+}
+
+.linked-status-clock {
+  display: grid;
+  justify-items: center;
   gap: 2px;
+  color: #6d7b73;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.linked-status-clock strong {
+  color: #2f6f57;
+  font-size: clamp(2.9rem, 6.4vw, 5rem);
   line-height: 1;
-}
-
-.clock-label {
-  font-size: clamp(0.82rem, 1.1vw, 1rem);
-  font-weight: 800;
-  opacity: 0.7;
-  letter-spacing: 0.14em;
-}
-
-.clock-time {
-  font-size: clamp(2.9rem, 5.8vw, 4.2rem);
-  font-weight: 950;
-  letter-spacing: 0.03em;
+  letter-spacing: .03em;
   font-variant-numeric: tabular-nums;
 }
 
-.status-page:not(.settings-open) .clock-time {
-  font-size: clamp(3rem, 5.6vw, 4.25rem) !important;
+.linked-status-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
 }
 
-.status-main-icon {
-  font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+.linked-status-icon {
+  font-size: clamp(3.4rem, 7vw, 6.2rem);
   line-height: 1;
-  margin: 0;
 }
 
-/* 設定收起時，圖示只當右上角小浮水印，不佔中間高度 */
-.status-page:not(.settings-open) .status-main-icon {
-  position: absolute !important;
-  right: 24px;
-  top: 18px;
-  font-size: clamp(1.1rem, 2vw, 1.7rem) !important;
-  opacity: 0.14;
-  pointer-events: none;
+.linked-status-main small {
+  display: block;
+  margin-bottom: 4px;
+  color: #6b7a70;
+  font-size: clamp(.9rem, 1.4vw, 1.1rem);
+  font-weight: 900;
 }
 
-.status-hero h1 {
+.linked-status-main h1 {
   margin: 0;
-  font-size: clamp(1.85rem, 3.8vw, 2.75rem);
-  line-height: 1;
+  color: #2f6f57;
+  font-size: clamp(2.4rem, 5.8vw, 5.2rem);
+  line-height: 1.05;
   font-weight: 950;
 }
 
-.status-page:not(.settings-open) .status-hero h1 {
-  font-size: clamp(1.75rem, 3.4vw, 2.55rem) !important;
-  line-height: 1 !important;
-}
-
-.status-hero p {
-  margin: 0;
+.linked-status-message {
   max-width: 900px;
-  font-size: clamp(0.9rem, 1.45vw, 1.12rem);
-  line-height: 1.15;
+  margin: 0;
+  color: #34495a;
+  font-size: clamp(1.15rem, 2.2vw, 1.8rem);
+  line-height: 1.5;
   font-weight: 900;
 }
 
-.status-page:not(.settings-open) .status-hero p {
-  font-size: clamp(0.82rem, 1.1vw, 0.96rem) !important;
-  line-height: 1.1 !important;
+.status-info-row {
+  min-height: 46px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
 }
 
-.status-hero strong {
+.minutes-left-badge,
+.next-period-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 150px;
-  padding: 5px 14px;
+  min-height: 40px;
+  padding: 8px 15px;
   border-radius: 999px;
-  font-size: clamp(0.95rem, 1.5vw, 1.2rem);
-  line-height: 1.05;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 8px 24px rgba(80, 60, 30, 0.08);
+  font-weight: 950;
 }
 
-.rule-grid {
-  width: min(100%, 820px);
+.minutes-left-badge {
+  background: #fff0c2;
+  color: #805716;
+  font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+}
+
+.next-period-badge {
+  background: #edf8f2;
+  color: #2f6f57;
+  font-size: clamp(.9rem, 1.35vw, 1.05rem);
+}
+
+.linked-rule-grid {
+  width: min(100%, 900px);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 9px;
-  margin-top: 6px;
-}
-
-.rule-grid span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 50px;
-  padding: 7px 12px;
-  border-radius: 18px;
-  font-size: clamp(1.02rem, 1.55vw, 1.25rem);
-  font-weight: 900;
-  line-height: 1.15;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 8px 22px rgba(80, 60, 30, 0.07);
-}
-
-.status-page:not(.settings-open) .rule-grid {
-  margin-top: 8px !important;
-  gap: 8px !important;
-}
-
-.status-page:not(.settings-open) .rule-grid span {
-  min-height: 48px !important;
-  padding: 6px 12px !important;
-  font-size: clamp(1rem, 1.45vw, 1.16rem) !important;
-}
-
-.schedule-editor {
-  margin-top: 0;
-  padding: 18px;
-}
-
-.section-head {
-  align-items: center;
-  gap: 12px;
-}
-
-.section-head h3 {
-  margin: 0;
-}
-
-.section-head p {
-  margin: 4px 0 0;
-  font-size: 0.95rem;
-  opacity: 0.72;
-}
-
-.test-time-row {
-  display: flex;
-  align-items: center;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  flex-wrap: wrap;
-  margin: 12px 0;
-  padding: 12px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.52);
 }
 
-.test-time-row label {
-  font-weight: 900;
-}
-
-.schedule-row {
-  grid-template-columns: 110px 1.1fr 125px 125px 2fr auto;
-}
-
-@media (max-height: 850px) and (min-width: 901px) {
-  .status-page {
-    gap: 6px;
-  }
-
-  .status-page:not(.settings-open) {
-    height: calc(100dvh - 98px) !important;
-    max-height: calc(100dvh - 98px) !important;
-  }
-
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: clamp(390px, 48dvh, 430px) !important;
-    height: clamp(390px, 48dvh, 430px) !important;
-    max-height: clamp(390px, 48dvh, 430px) !important;
-    padding: 10px 22px 12px !important;
-    gap: 5px !important;
-  }
-
-  .clock-label {
-    font-size: 0.78rem;
-  }
-
-  .status-page:not(.settings-open) .clock-time {
-    font-size: clamp(2.7rem, 5.1vw, 3.75rem) !important;
-  }
-
-  .status-page:not(.settings-open) .status-hero h1 {
-    font-size: clamp(1.55rem, 3vw, 2.15rem) !important;
-  }
-
-  .status-page:not(.settings-open) .status-hero p {
-    font-size: clamp(0.76rem, 1vw, 0.9rem) !important;
-  }
-
-  .status-page:not(.settings-open) .rule-grid span {
-    min-height: 44px !important;
-    padding: 5px 11px !important;
-    font-size: clamp(0.96rem, 1.35vw, 1.08rem) !important;
-  }
+.linked-rule-grid span {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  padding: 9px 12px;
+  border-radius: 17px;
+  background: rgba(255, 255, 255, .82);
+  color: #34495a;
+  box-shadow: 0 5px 18px rgba(36, 59, 83, .07);
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  line-height: 1.25;
+  font-weight: 950;
 }
 
 @media (max-height: 760px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: 390px !important;
-    height: 390px !important;
-    max-height: 390px !important;
+  .linked-status-page {
+    min-height: 560px;
+    gap: 8px;
   }
 
-  .status-page:not(.settings-open) .clock-time {
-    font-size: clamp(2.45rem, 4.6vw, 3.25rem) !important;
+  .linked-status-hero {
+    gap: 8px;
+    padding-block: 14px;
   }
 
-  .status-page:not(.settings-open) .rule-grid span {
-    min-height: 40px !important;
+  .linked-status-clock strong {
+    font-size: clamp(2.5rem, 5.2vw, 3.8rem);
+  }
+
+  .linked-status-main h1 {
+    font-size: clamp(2rem, 4.6vw, 3.8rem);
+  }
+
+  .linked-status-icon {
+    font-size: clamp(3rem, 5.5vw, 4.6rem);
+  }
+
+  .linked-status-message {
+    font-size: clamp(1rem, 1.7vw, 1.35rem);
+  }
+
+  .linked-rule-grid span {
+    min-height: 48px;
   }
 }
 
 @media (max-width: 900px) {
-  .status-page,
-  .status-page:not(.settings-open) {
-    height: auto !important;
-    max-height: none !important;
-    min-height: auto;
-    overflow: visible !important;
+  .linked-status-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
-  .status-title-row {
-    align-items: flex-start;
+  .linked-status-title-row {
+    align-items: stretch;
   }
 
-  .status-actions {
-    width: 100%;
+  .linked-status-actions {
     justify-content: flex-start;
   }
 
-  .status-hero,
-  .status-page:not(.settings-open) .status-hero.card {
-    height: auto !important;
-    max-height: none !important;
-    min-height: 400px !important;
-    padding: 20px 16px !important;
+  .linked-status-hero {
+    min-height: 520px;
   }
 
-  .status-page:not(.settings-open) .status-main-icon {
-    position: static !important;
-    opacity: 1;
-    font-size: 1.8rem !important;
-  }
-
-  .rule-grid {
+  .linked-rule-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .schedule-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .schedule-row input[placeholder="給學生看的提醒"],
-  .schedule-row .danger-text {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 560px) {
-  .status-hero,
-  .status-page:not(.settings-open) .status-hero.card {
-    min-height: 380px !important;
-    gap: 8px !important;
-  }
-
-  .clock-time,
-  .status-page:not(.settings-open) .clock-time {
-    font-size: clamp(2.8rem, 14vw, 3.8rem) !important;
-  }
-
-  .status-hero h1,
-  .status-page:not(.settings-open) .status-hero h1 {
-    font-size: clamp(1.9rem, 10vw, 2.8rem) !important;
-  }
-
-  .status-hero p,
-  .status-page:not(.settings-open) .status-hero p {
-    font-size: clamp(0.92rem, 4.4vw, 1.15rem) !important;
-  }
-
-  .rule-grid {
-    gap: 8px;
-  }
-
-  .rule-grid span,
-  .status-page:not(.settings-open) .rule-grid span {
-    min-height: 48px;
-    border-radius: 18px;
-  }
-}
-
-/* 2026-07-07 status hero final-fit confirm-keyword
-   最終覆蓋：設定收起時，把中間大白框鎖在一頁式高度內。 */
-.status-page:not(.settings-open) .status-hero.card,
-.status-page:not(.settings-open) section.status-hero.card {
-  flex: 0 0 clamp(410px, 49dvh, 460px) !important;
-  height: clamp(410px, 49dvh, 460px) !important;
-  min-height: 0 !important;
-  max-height: clamp(410px, 49dvh, 460px) !important;
-  padding-top: 12px !important;
-  padding-bottom: 14px !important;
-  gap: 4px !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
-}
-
-.status-page:not(.settings-open) .clock-label {
-  font-size: clamp(0.72rem, 0.95vw, 0.88rem) !important;
-}
-
-.status-page:not(.settings-open) .clock-time {
-  font-size: clamp(2.9rem, 5.35vw, 4rem) !important;
-}
-
-.status-page:not(.settings-open) .status-hero h1 {
-  font-size: clamp(1.6rem, 3.15vw, 2.35rem) !important;
-}
-
-.status-page:not(.settings-open) .status-hero p {
-  font-size: clamp(0.78rem, 1.05vw, 0.92rem) !important;
-  line-height: 1.08 !important;
-}
-
-.status-page:not(.settings-open) .rule-grid {
-  margin-top: 6px !important;
-  gap: 8px !important;
-  max-width: 760px !important;
-}
-
-.status-page:not(.settings-open) .rule-grid span {
-  min-height: 46px !important;
-  padding: 6px 12px !important;
-  font-size: clamp(0.96rem, 1.35vw, 1.08rem) !important;
-}
-
-@media (max-height: 850px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: clamp(380px, 46dvh, 420px) !important;
-    height: clamp(380px, 46dvh, 420px) !important;
-    max-height: clamp(380px, 46dvh, 420px) !important;
-  }
-}
-
-@media (max-height: 760px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: 370px !important;
-    height: 370px !important;
-    max-height: 370px !important;
-  }
-}
-
-/* CONFIRM_STATUS_BALANCED_20260707_2058: FINAL OVERRIDE — 設定收起時，強制讓大白框比上一版小一點並維持一頁式 */
-.status-page:not(.settings-open) .status-hero.card,
-.status-page:not(.settings-open) section.status-hero.card {
-  flex: 0 0 clamp(390px, 46dvh, 430px) !important;
-  height: clamp(390px, 46dvh, 430px) !important;
-  min-height: 0 !important;
-  max-height: clamp(390px, 46dvh, 430px) !important;
-  padding: 10px 24px 12px !important;
-  gap: 4px !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
-}
-
-.status-page:not(.settings-open) .clock-time {
-  font-size: clamp(2.8rem, 5.05vw, 3.75rem) !important;
-}
-
-.status-page:not(.settings-open) .status-hero h1 {
-  font-size: clamp(1.45rem, 2.85vw, 2.1rem) !important;
-}
-
-.status-page:not(.settings-open) .status-hero p {
-  font-size: clamp(0.74rem, 0.95vw, 0.88rem) !important;
-  line-height: 1.08 !important;
-}
-
-.status-page:not(.settings-open) .rule-grid {
-  margin-top: 5px !important;
-  gap: 8px !important;
-  max-width: 760px !important;
-}
-
-.status-page:not(.settings-open) .rule-grid span {
-  min-height: 44px !important;
-  padding: 5px 12px !important;
-  font-size: clamp(0.95rem, 1.32vw, 1.08rem) !important;
-}
-
-@media (max-height: 850px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: clamp(365px, 44dvh, 400px) !important;
-    height: clamp(365px, 44dvh, 400px) !important;
-    max-height: clamp(365px, 44dvh, 400px) !important;
-  }
-}
-
-
-
-/* CONFIRM_STATUS_BALANCED_20260707_2058
-   最終版：比 20:45 截圖大很多；比 20:37 截圖矮，目標是剛好一頁式。 */
-.status-page:not(.settings-open) {
-  height: calc(100dvh - 104px) !important;
-  max-height: calc(100dvh - 104px) !important;
-  overflow: hidden !important;
-}
-
-.status-page:not(.settings-open) .status-hero.card,
-.status-page:not(.settings-open) section.status-hero.card {
-  flex: 0 0 min(620px, calc(100dvh - 220px)) !important;
-  height: min(620px, calc(100dvh - 220px)) !important;
-  min-height: 0 !important;
-  max-height: min(620px, calc(100dvh - 220px)) !important;
-  padding: 28px 34px 30px !important;
-  gap: 10px !important;
-  justify-content: center !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
-}
-
-.status-page:not(.settings-open) .clock-label {
-  font-size: clamp(0.9rem, 1.05vw, 1.05rem) !important;
-}
-
-.status-page:not(.settings-open) .clock-time {
-  font-size: clamp(4rem, 5.25vw, 5.15rem) !important;
-}
-
-.status-page:not(.settings-open) .status-main-icon {
-  right: 28px !important;
-  top: 22px !important;
-  font-size: clamp(1.3rem, 2vw, 1.8rem) !important;
-  opacity: 0.12 !important;
-}
-
-.status-page:not(.settings-open) .status-hero h1 {
-  font-size: clamp(2.25rem, 4vw, 3.35rem) !important;
-  line-height: 1.02 !important;
-}
-
-.status-page:not(.settings-open) .status-hero p {
-  font-size: clamp(1rem, 1.45vw, 1.3rem) !important;
-  line-height: 1.12 !important;
-  max-width: 960px !important;
-}
-
-.status-page:not(.settings-open) .rule-grid {
-  width: min(100%, 900px) !important;
-  max-width: 900px !important;
-  margin-top: 12px !important;
-  gap: 12px !important;
-}
-
-.status-page:not(.settings-open) .rule-grid span {
-  min-height: 58px !important;
-  padding: 8px 16px !important;
-  border-radius: 20px !important;
-  font-size: clamp(1.12rem, 1.55vw, 1.36rem) !important;
-}
-
-@media (max-height: 850px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: min(560px, calc(100dvh - 205px)) !important;
-    height: min(560px, calc(100dvh - 205px)) !important;
-    max-height: min(560px, calc(100dvh - 205px)) !important;
-    padding-top: 22px !important;
-    padding-bottom: 24px !important;
-    gap: 8px !important;
-  }
-
-  .status-page:not(.settings-open) .clock-time {
-    font-size: clamp(3.5rem, 5vw, 4.6rem) !important;
-  }
-
-  .status-page:not(.settings-open) .status-hero h1 {
-    font-size: clamp(2rem, 3.7vw, 3rem) !important;
-  }
-
-  .status-page:not(.settings-open) .rule-grid span {
-    min-height: 52px !important;
-  }
-}
-
-@media (max-height: 760px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: min(500px, calc(100dvh - 190px)) !important;
-    height: min(500px, calc(100dvh - 190px)) !important;
-    max-height: min(500px, calc(100dvh - 190px)) !important;
-  }
-}
-
-
-
-/* CONFIRM_STATUS_ICONS_20260707_2115
-   各作息代表圖示：小尺寸放在狀態標題旁，保留辨識度但不增加白框高度。 */
-.status-title-display {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(8px, 1.1vw, 14px);
-  line-height: 1;
-  margin: 0;
-}
-
-.status-title-display h1 {
-  margin: 0;
-}
-
-.status-title-display .status-main-icon {
-  position: static;
-  opacity: 1;
-  margin: 0;
-  flex: 0 0 auto;
-}
-
-.status-page:not(.settings-open) .status-title-display {
-  gap: clamp(8px, 1vw, 12px) !important;
-}
-
-.status-page:not(.settings-open) .status-title-display .status-main-icon {
-  position: static !important;
-  right: auto !important;
-  top: auto !important;
-  opacity: 1 !important;
-  font-size: clamp(1.55rem, 2.15vw, 2.15rem) !important;
-  line-height: 1 !important;
-  pointer-events: none;
-}
-
-.status-page:not(.settings-open) .status-title-display h1 {
-  margin: 0 !important;
-}
-
-@media (max-height: 850px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-title-display .status-main-icon {
-    font-size: clamp(1.35rem, 1.9vw, 1.85rem) !important;
-  }
-}
-
-@media (max-width: 560px) {
-  .status-title-display {
-    gap: 8px !important;
-  }
-
-  .status-page:not(.settings-open) .status-title-display .status-main-icon,
-  .status-title-display .status-main-icon {
-    font-size: clamp(1.5rem, 7vw, 2rem) !important;
-  }
-}
-
-
-/* CONFIRM_STATUS_LINE_SPACING_20260707_2128
-   狀態文字行距微調：時間、狀態、提醒、剩餘時間稍微分開；白框高度不放大，維持一頁式。 */
-.status-page:not(.settings-open) .status-hero.card,
-.status-page:not(.settings-open) section.status-hero.card {
-  gap: 12px !important;
-  justify-content: center !important;
-}
-
-.status-page:not(.settings-open) .status-clock {
-  gap: 5px !important;
-  margin-bottom: 2px !important;
-}
-
-.status-page:not(.settings-open) .status-title-display {
-  gap: 12px !important;
-  margin-top: 4px !important;
-  margin-bottom: 0 !important;
-}
-
-.status-page:not(.settings-open) .status-title-display .status-main-icon {
-  font-size: clamp(1.45rem, 1.9vw, 2rem) !important;
-}
-
-.status-page:not(.settings-open) .status-hero h1 {
-  line-height: 1.12 !important;
-}
-
-.status-page:not(.settings-open) .status-hero p {
-  line-height: 1.35 !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-.status-page:not(.settings-open) .minutes-left,
-.status-page:not(.settings-open) .status-hero strong.minutes-left {
-  margin-top: 0 !important;
-  padding: 8px 22px !important;
-  min-width: 180px !important;
-  border-radius: 999px !important;
-  font-size: clamp(1rem, 1.45vw, 1.25rem) !important;
-  font-weight: 950 !important;
-  letter-spacing: 0.04em !important;
-  color: #2f6f55 !important;
-  background: rgba(255, 248, 220, 0.96) !important;
-  border: 2px solid rgba(47, 111, 85, 0.18) !important;
-  box-shadow: 0 10px 24px rgba(80, 60, 30, 0.1) !important;
-}
-
-.status-page:not(.settings-open) .rule-grid {
-  margin-top: 4px !important;
-}
-
-@media (max-height: 850px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    gap: 9px !important;
-  }
-
-  .status-page:not(.settings-open) .status-clock {
-    gap: 4px !important;
-  }
-
-  .status-page:not(.settings-open) .status-title-display {
-    margin-top: 2px !important;
-    gap: 10px !important;
-  }
-
-  .status-page:not(.settings-open) .minutes-left,
-  .status-page:not(.settings-open) .status-hero strong.minutes-left {
-    padding: 6px 18px !important;
-    min-width: 160px !important;
-    font-size: clamp(0.92rem, 1.25vw, 1.1rem) !important;
-  }
-}
-
-@media (max-height: 760px) and (min-width: 901px) {
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    gap: 7px !important;
-  }
-
-  .status-page:not(.settings-open) .minutes-left,
-  .status-page:not(.settings-open) .status-hero strong.minutes-left {
-    padding: 5px 16px !important;
-  }
-}
-
-
-
-/* ✅ HUA_STATUS_ONE_SCREEN_MOBILE_REVIEW_20260710
-   現在狀態：桌機大螢幕維持一頁式；手機保留主訊息清楚可讀，設定區自然往下滑。 */
-@media (min-width: 981px) and (max-height: 820px) {
-  .status-page:not(.settings-open) {
-    height: calc(100svh - 92px) !important;
-    max-height: calc(100svh - 92px) !important;
-  }
-
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card {
-    flex-basis: clamp(330px, 43svh, 400px) !important;
-    height: clamp(330px, 43svh, 400px) !important;
-    max-height: clamp(330px, 43svh, 400px) !important;
   }
 }
 
 @media (max-width: 760px) {
-  .status-page,
-  .status-page:not(.settings-open) {
-    height: auto !important;
-    max-height: none !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-  }
-
-  .status-title-row {
-    align-items: stretch !important;
-  }
-
-  .status-actions {
+  .linked-status-actions,
+  .status-test-panel {
     width: 100%;
-    justify-content: flex-start !important;
   }
 
-  .status-actions button {
-    flex: 1 1 140px;
+  .linked-status-actions button {
+    flex: 1 1 120px;
   }
 
-  .status-page:not(.settings-open) .status-hero.card,
-  .status-page:not(.settings-open) section.status-hero.card,
-  .status-hero {
-    height: auto !important;
-    max-height: none !important;
-    min-height: min(58svh, 430px) !important;
-    padding: 22px 16px !important;
-    overflow: visible !important;
+  .status-test-panel {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .clock-time {
-    font-size: clamp(2.35rem, 13vw, 3.4rem) !important;
+  .status-test-panel input,
+  .status-test-panel select {
+    width: 100%;
   }
 
-  .status-title-display {
-    flex-wrap: wrap;
+  .linked-status-hero {
+    min-height: 0;
+    padding: 22px 14px;
+    overflow: visible;
+  }
+
+  .linked-status-main {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .linked-status-clock strong {
+    font-size: clamp(2.7rem, 14vw, 4rem);
+  }
+
+  .linked-status-icon {
+    font-size: clamp(3.3rem, 18vw, 5rem);
+  }
+
+  .linked-status-main h1 {
+    font-size: clamp(2.2rem, 12vw, 3.6rem);
+  }
+
+  .linked-status-message {
+    font-size: clamp(1.05rem, 5vw, 1.35rem);
+  }
+
+  .status-info-row {
+    width: 100%;
+  }
+
+  .minutes-left-badge,
+  .next-period-badge {
+    width: 100%;
     justify-content: center;
-  }
-
-  .status-hero h1,
-  .status-page:not(.settings-open) .status-hero h1 {
-    font-size: clamp(1.8rem, 9vw, 2.6rem) !important;
-    line-height: 1.14 !important;
-  }
-
-  .status-hero p,
-  .status-page:not(.settings-open) .status-hero p {
-    font-size: clamp(1rem, 4.5vw, 1.22rem) !important;
-    line-height: 1.55 !important;
-  }
-
-  .rule-grid {
-    grid-template-columns: 1fr !important;
+    border-radius: 15px;
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .linked-status-hero.warning {
+    animation: none;
+  }
+}
 </style>

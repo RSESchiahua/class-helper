@@ -1982,3 +1982,103 @@ body {
     font-size: 13px !important;
   }
 }
+
+/* ✅ HUA_CORE_NAV_FIXED_ORDER_STYLE_20260711
+   核心設定固定於側欄最上方；只有下方日常工具顯示拖曳把手。 */
+.sidebar-core-item {
+  cursor: default;
+}
+
+.sidebar-core-item:hover {
+  transform: none;
+}
+
+.sidebar-core-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 2px 0;
+  color: #82928a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.sidebar-core-divider::before,
+.sidebar-core-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  background: #dceee6;
+}
+
+@media (max-width: 760px) {
+  .sidebar-core-divider {
+    grid-column: 1 / -1 !important;
+    width: 100%;
+    margin: 1px 0;
+    font-size: 10px;
+  }
+}
+
+/* ✅ HUA_SUBJECT_PALETTE_COLLAPSIBLE_HALF_DAY_STYLE_20260711
+   課表科目工具盤與半天課收折列：強化觸控、避免文字誤選，並保護手機寬度。 */
+.subject-palette,
+.half-day-collapsible,
+.desktop-week-table,
+.mobile-week-editor {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.subject-tool,
+.half-day-summary-button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+@media (max-width: 760px) {
+  .subject-palette,
+  .subject-group-grid,
+  .subject-tools,
+  .half-day-panel,
+  .half-day-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ✅ HUA_SUBJECT_TOOL_UNIFORM_SIZE_STYLE_20260711
+   科目工具盤：分類框等高、科目按鍵等寬等高，圖示與文字穩定置中。 */
+.weekly-schedule-page .subject-group-grid {
+  align-items: stretch;
+}
+
+.weekly-schedule-page .subject-group {
+  height: 100%;
+}
+
+.weekly-schedule-page .subject-tool {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.weekly-schedule-page .subject-tool-icon,
+.weekly-schedule-page .subject-tool-name {
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .weekly-schedule-page .subject-tools {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .weekly-schedule-page .subject-tool {
+    width: 100%;
+    min-width: 0;
+  }
+}

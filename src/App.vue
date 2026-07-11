@@ -2,23 +2,25 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
-// ✅ HUA_SIDEBAR_GROUP_CLASS_AFFAIRS_20260710：班務分配改成可展開群組，避免左側功能列過滿。
-// SIDEBAR_DRAG_SORT_20260707：功能列只儲存顯示順序，不改變路由功能。
+// ✅ HUA_CORE_NAV_FIXED_ORDER_20260711：首頁、學生名單、班務分配、課表與作息、現在狀態固定在最上方；其餘功能才可拖曳排序。
+// ✅ HUA_SIDEBAR_GROUP_CLASS_AFFAIRS_20260710：班務分配為可展開群組。
 const SIDEBAR_ORDER_KEY = 'classAssistantSidebarOrderV1'
 const CLASS_AFFAIRS_OPEN_KEY = 'classAssistantClassAffairsOpenV1'
+const CORE_NAV_KEYS = ['dashboard', 'students', 'classAffairs', 'schedule', 'status']
 
 const route = useRoute()
 
 const defaultNavItems = [
-  { key: 'dashboard', path: '/', label: '🏠 首頁' },
-  { key: 'status', path: '/status', label: '🔔 現在狀態' },
+  { key: 'dashboard', path: '/', label: '🏠 首頁', fixed: true },
+  { key: 'students', path: '/students', label: '👨‍🎓 學生名單', fixed: true },
+  { key: 'classAffairs', label: '🧩 班務分配', type: 'group', fixed: true },
+  { key: 'schedule', path: '/schedule', label: '📅 課表與作息', fixed: true },
+  { key: 'status', path: '/status', label: '🔔 現在狀態', fixed: true },
   { key: 'notebook', path: '/notebook', label: '📚 簿本繳交' },
   { key: 'calendar', path: '/calendar', label: '🗓️ 行事曆' },
-  { key: 'students', path: '/students', label: '👨‍🎓 學生名單' },
   { key: 'toothbrush', path: '/toothbrush', label: '🦷 潔牙消毒' },
   { key: 'points', path: '/points', label: '⭐ 積分獎勵' },
   { key: 'library', path: '/library', label: '📖 班書借閱' },
-  { key: 'classAffairs', label: '🧩 班務分配', type: 'group' },
   { key: 'wheel', path: '/wheel', label: '🎡 抽籤轉盤' }
 ]
 
@@ -28,21 +30,23 @@ const classAffairNavItems = [
   { key: 'seats', path: '/seats', label: '🪑 座位安排' }
 ]
 
-const defaultOrder = defaultNavItems.map(item => item.key)
+const fixedNavItems = defaultNavItems.filter(item => item.fixed)
+const movableNavItems = defaultNavItems.filter(item => !item.fixed)
+const defaultMovableOrder = movableNavItems.map(item => item.key)
 
 function loadSidebarOrder() {
   try {
     const saved = JSON.parse(localStorage.getItem(SIDEBAR_ORDER_KEY) || '[]')
-    if (Array.isArray(saved)) {
-      const hasOldUngroupedClassAffairs = saved.some(key => ['cleaning', 'jobs', 'seats'].includes(key))
-      if (hasOldUngroupedClassAffairs) return []
-      return saved.filter(key => defaultOrder.includes(key))
-    }
+    if (!Array.isArray(saved)) return [...defaultMovableOrder]
+
+    // 舊版曾把所有項目一起儲存；這裡只取可移動項目，固定核心順序不受舊資料影響。
+    const validSaved = saved.filter(key => defaultMovableOrder.includes(key))
+    const missing = defaultMovableOrder.filter(key => !validSaved.includes(key))
+    return [...validSaved, ...missing]
   } catch (error) {
     console.warn('功能列排序讀取失敗，已使用預設順序。', error)
+    return [...defaultMovableOrder]
   }
-
-  return []
 }
 
 function loadClassAffairsOpen() {
@@ -56,15 +60,12 @@ const draggedKey = ref('')
 let logoClickCount = 0
 let logoTimer = null
 
-const orderedNavItems = computed(() => {
-  const itemMap = new Map(defaultNavItems.map(item => [item.key, item]))
-  const savedItems = sidebarOrder.value
-    .map(key => itemMap.get(key))
-    .filter(Boolean)
-  const newItems = defaultNavItems.filter(item => !sidebarOrder.value.includes(item.key))
-
-  return [...savedItems, ...newItems]
+const orderedMovableNavItems = computed(() => {
+  const itemMap = new Map(movableNavItems.map(item => [item.key, item]))
+  return sidebarOrder.value.map(key => itemMap.get(key)).filter(Boolean)
 })
+
+const orderedNavItems = computed(() => [...fixedNavItems, ...orderedMovableNavItems.value])
 
 const isClassAffairsActive = computed(() => {
   return classAffairNavItems.some(item => route.path.startsWith(item.path))
@@ -78,8 +79,13 @@ watch(classAffairsOpen, value => {
   localStorage.setItem(CLASS_AFFAIRS_OPEN_KEY, value ? 'true' : 'false')
 })
 
-function saveSidebarOrder(items = orderedNavItems.value) {
-  const keys = items.map(item => item.key)
+function isFixedItem(itemOrKey) {
+  const key = typeof itemOrKey === 'string' ? itemOrKey : itemOrKey?.key
+  return CORE_NAV_KEYS.includes(key)
+}
+
+function saveSidebarOrder(items = orderedMovableNavItems.value) {
+  const keys = items.map(item => item.key).filter(key => defaultMovableOrder.includes(key))
   sidebarOrder.value = keys
   localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(keys))
 }
@@ -104,6 +110,11 @@ function toggleClassAffairs() {
 }
 
 function handleNavDragStart(event, key) {
+  if (isFixedItem(key)) {
+    event.preventDefault()
+    return
+  }
+
   draggedKey.value = key
   event.dataTransfer.effectAllowed = 'move'
   event.dataTransfer.setData('text/plain', key)
@@ -113,9 +124,9 @@ function handleNavDrop(event, targetKey) {
   const sourceKey = draggedKey.value || event.dataTransfer.getData('text/plain')
   draggedKey.value = ''
 
-  if (!sourceKey || sourceKey === targetKey) return
+  if (!sourceKey || sourceKey === targetKey || isFixedItem(sourceKey) || isFixedItem(targetKey)) return
 
-  const nextItems = [...orderedNavItems.value]
+  const nextItems = [...orderedMovableNavItems.value]
   const sourceIndex = nextItems.findIndex(item => item.key === sourceKey)
   const targetIndex = nextItems.findIndex(item => item.key === targetKey)
 
@@ -127,9 +138,9 @@ function handleNavDrop(event, targetKey) {
 }
 
 function resetSidebarOrder() {
-  sidebarOrder.value = [...defaultOrder]
+  sidebarOrder.value = [...defaultMovableOrder]
   classAffairsOpen.value = false
-  localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(defaultOrder))
+  localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(defaultMovableOrder))
 }
 </script>
 
@@ -141,8 +152,7 @@ function resetSidebarOrder() {
         <span class="sidebar-subtitle">每天快一點，班級暖一點</span>
       </button>
 
-      <!-- ✅ HUA_SIDEBAR_GROUP_CLASS_AFFAIRS_20260710 -->
-      <nav class="sidebar-nav" aria-label="主要功能，可拖曳排序">
+      <nav class="sidebar-nav" aria-label="主要功能；上方核心功能固定，下方日常工具可拖曳排序">
         <template v-for="item in orderedNavItems" :key="item.key">
           <button
             v-if="item.type === 'group'"
@@ -151,9 +161,10 @@ function resetSidebarOrder() {
             :class="{
               active: isClassAffairsActive,
               expanded: showClassAffairsChildren,
-              dragging: draggedKey === item.key
+              dragging: draggedKey === item.key,
+              'sidebar-core-item': item.fixed
             }"
-            draggable="true"
+            :draggable="!item.fixed"
             :aria-expanded="showClassAffairsChildren"
             @click="toggleClassAffairs"
             @dragstart="handleNavDragStart($event, item.key)"
@@ -163,22 +174,25 @@ function resetSidebarOrder() {
           >
             <span class="nav-label">{{ item.label }}</span>
             <span class="group-chevron" aria-hidden="true">{{ showClassAffairsChildren ? '⌄' : '›' }}</span>
-            <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+            <span v-if="!item.fixed" class="drag-handle" aria-hidden="true">⋮⋮</span>
           </button>
 
           <RouterLink
             v-else
             class="sidebar-link"
-            :class="{ dragging: draggedKey === item.key }"
+            :class="{
+              dragging: draggedKey === item.key,
+              'sidebar-core-item': item.fixed
+            }"
             :to="item.path"
-            draggable="true"
+            :draggable="!item.fixed"
             @dragstart="handleNavDragStart($event, item.key)"
             @dragover.prevent
             @drop.prevent="handleNavDrop($event, item.key)"
             @dragend="draggedKey = ''"
           >
             <span class="nav-label">{{ item.label }}</span>
-            <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+            <span v-if="!item.fixed" class="drag-handle" aria-hidden="true">⋮⋮</span>
           </RouterLink>
 
           <div
@@ -195,11 +209,15 @@ function resetSidebarOrder() {
               <span class="nav-label">{{ child.label }}</span>
             </RouterLink>
           </div>
+
+          <div v-if="item.key === 'status'" class="sidebar-core-divider" aria-hidden="true">
+            <span>日常工具・可排序</span>
+          </div>
         </template>
       </nav>
 
       <button class="sidebar-reset-sort" type="button" @click="resetSidebarOrder">
-        ↺ 重設功能排序
+        ↺ 重設日常工具排序
       </button>
     </aside>
 
