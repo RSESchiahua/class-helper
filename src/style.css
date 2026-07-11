@@ -2082,3 +2082,173 @@ body {
     min-width: 0;
   }
 }
+
+/* ✅ HUA_FIREBASE_SYNC_PANEL_STYLE_20260711
+   Firebase 正式版：桌機與手機共用的登入、同步狀態與備份工具列。 */
+.cloud-sync-panel {
+  position: sticky;
+  top: 10px;
+  z-index: 40;
+  max-width: 1280px;
+  min-height: 52px;
+  margin: 0 auto 14px;
+  padding: 8px 10px 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d8e9e0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 8px 22px rgba(51, 73, 63, .09);
+  backdrop-filter: blur(10px);
+}
+
+.cloud-sync-status {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.cloud-sync-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #eef8f3;
+  font-size: 18px;
+}
+
+.cloud-sync-status > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 9px;
+  row-gap: 1px;
+}
+
+.cloud-sync-status strong {
+  color: #2f6f57;
+  white-space: nowrap;
+}
+
+.cloud-sync-status small {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cloud-sync-status small:last-child:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.cloud-sync-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cloud-sync-actions button {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 11px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.cloud-primary-action {
+  background: #4e9f7a;
+  color: white;
+}
+
+.cloud-soft-action {
+  background: #f3faf6;
+  color: #2f6f57;
+  border: 1px solid #cfe7da;
+}
+
+.cloud-text-action {
+  padding-inline: 7px !important;
+  background: transparent;
+  color: #667085;
+}
+
+.cloud-action-message {
+  position: absolute;
+  right: 12px;
+  bottom: -25px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  background: #243b53;
+  color: white;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.cloud-permission-denied {
+  border-color: #efd58d;
+  background: rgba(255, 250, 232, .97);
+}
+
+.cloud-permission-denied .cloud-sync-icon {
+  background: #fff0bd;
+}
+
+.cloud-offline,
+.cloud-error {
+  border-color: #efc6c0;
+  background: rgba(255, 247, 245, .97);
+}
+
+.cloud-syncing .cloud-sync-icon,
+.cloud-connecting .cloud-sync-icon,
+.cloud-starting .cloud-sync-icon {
+  animation: cloudSyncPulse 1.15s ease-in-out infinite alternate;
+}
+
+@keyframes cloudSyncPulse {
+  from { transform: scale(.92); opacity: .72; }
+  to { transform: scale(1.06); opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  .cloud-sync-panel {
+    position: relative;
+    top: auto;
+    min-height: 0;
+    margin-bottom: 10px;
+    padding: 8px 9px;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+    border-radius: 15px;
+  }
+
+  .cloud-sync-status > div {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cloud-sync-actions {
+    justify-content: flex-start;
+  }
+
+  .cloud-sync-actions button {
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+
+  .cloud-action-message {
+    right: 9px;
+    bottom: -23px;
+  }
+}

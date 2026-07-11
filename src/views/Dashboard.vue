@@ -1,7 +1,8 @@
 <script setup>
 // ✅ HUA_CONTACT_DATE_IN_HEADING_20260710：日期移到「聯絡簿」標題後方，並移除中央分隔線。
 // ✅ HUA_VERTICAL_BOOK_DATE_NOTE_LINES_FIX_20260710：日期重排、提示放大置底、移除聯絡簿分隔線。
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { CLOUD_DATA_UPDATED_EVENT } from '../services/cloudSync'
 
 const className = ref(localStorage.getItem('className') || '')
 const studentSource = ref(localStorage.getItem('students') || '')
@@ -21,6 +22,41 @@ const contactBook = ref(loadJson('classHelperContactBook', {
   carry: '',
   reminder: ''
 }))
+
+
+// ✅ HUA_FIREBASE_DASHBOARD_LIVE_SYNC_20260711：手機編修聯絡簿後，教室桌機首頁立即更新。
+function refreshDashboardFromCloud(event) {
+  const keys = new Set(event?.detail?.keys || [])
+  if (keys.size === 0 || keys.has('className')) {
+    className.value = localStorage.getItem('className') || ''
+  }
+  if (keys.size === 0 || keys.has('students')) {
+    studentSource.value = localStorage.getItem('students') || ''
+  }
+  if (keys.size === 0 || keys.has('classHelperHomeDisplay')) {
+    homeDisplay.value = loadJson('classHelperHomeDisplay', {
+      contactBook: true,
+      dailyQuote: true,
+      reflection: true,
+      contactLayout: 'horizontal'
+    })
+  }
+  if (keys.size === 0 || keys.has('classHelperContactBook')) {
+    contactBook.value = loadJson('classHelperContactBook', {
+      homework: '',
+      carry: '',
+      reminder: ''
+    })
+  }
+}
+
+onMounted(() => {
+  window.addEventListener(CLOUD_DATA_UPDATED_EVENT, refreshDashboardFromCloud)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(CLOUD_DATA_UPDATED_EVENT, refreshDashboardFromCloud)
+})
 
 const contactSections = computed(() => [
   { key: 'homework', icon: '📚', title: '作業', items: toLines(contactBook.value.homework) },

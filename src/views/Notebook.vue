@@ -1,7 +1,8 @@
 <script setup>
 // ✅ HUA_POINTS_2_NOTEBOOK_INTEGRATION_20260710：簿本全班完成會先慶祝，再由老師選擇是否全班 +1。
 // ✅ HUA_NOTEBOOK_ONE_SCREEN_MOBILE_REVIEW_20260710：簿本頁已補桌機一頁式壓縮與手機不卡片切半。
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { CLOUD_DATA_UPDATED_EVENT } from '../services/cloudSync'
 
 const homeworkOptions = [
   '聯絡簿', '甲本', '乙本', '國習', '數習', '社習',
@@ -13,8 +14,10 @@ const subjects = ['國語', '數學', '社會', '自然', '英語']
 const STORAGE_KEY = 'notebookBoardsV2'
 const WEEKLY_KEY = 'notebookWeeklyRecordsV2'
 const NOTIFIED_KEY = 'notebookNotifiedV2'
+const cloudRefreshSeed = ref(0)
 
 const students = computed(() => {
+  cloudRefreshSeed.value
   const text = localStorage.getItem('students') || ''
   return text
     .split('\n')
@@ -22,7 +25,10 @@ const students = computed(() => {
     .filter(Boolean)
 })
 
-const className = computed(() => localStorage.getItem('className') || '三年○班')
+const className = computed(() => {
+  cloudRefreshSeed.value
+  return localStorage.getItem('className') || '三年○班'
+})
 
 // ✅ HUA_COMPLETION_CLASS_ONLY_REWARD_20260710：全班完成後由老師決定是否加分，不自動發放。
 const COMPLETION_POINT_RECORDS_KEY = 'classAssistantPointRecordsV1'
@@ -201,10 +207,38 @@ watch([isReminderOpen, isWeeklyOpen, isClearOpen], ([reminderOpen, weeklyOpen, c
 onBeforeUnmount(() => {
   document.body.style.overflow = ''
   document.documentElement.style.overflow = ''
+  window.removeEventListener(CLOUD_DATA_UPDATED_EVENT, refreshNotebookFromCloud)
 })
 
 const weeklyRecords = ref(loadJson(WEEKLY_KEY, []))
 const notifiedMap = ref(loadJson(NOTIFIED_KEY, {}))
+
+
+// ✅ HUA_FIREBASE_NOTEBOOK_LIVE_SYNC_20260711：手機登記缺交／訂正後，前方桌機簿本頁立即更新。
+function refreshNotebookFromCloud(event) {
+  const keys = new Set(event?.detail?.keys || [])
+
+  if (keys.size === 0 || keys.has('students') || keys.has('className')) {
+    cloudRefreshSeed.value += 1
+  }
+
+  if (keys.size === 0 || keys.has(STORAGE_KEY)) {
+    const nextBoards = loadBoards()
+    boards.splice(0, boards.length, ...nextBoards)
+  }
+
+  if (keys.size === 0 || keys.has(WEEKLY_KEY)) {
+    weeklyRecords.value = loadJson(WEEKLY_KEY, [])
+  }
+
+  if (keys.size === 0 || keys.has(NOTIFIED_KEY)) {
+    notifiedMap.value = loadJson(NOTIFIED_KEY, {})
+  }
+}
+
+onMounted(() => {
+  window.addEventListener(CLOUD_DATA_UPDATED_EVENT, refreshNotebookFromCloud)
+})
 
 const visibleBoards = computed(() => boards)
 

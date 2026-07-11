@@ -4,6 +4,7 @@
 // ✅ HUA_POINTS_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
 // POINTS_V5_CONFIRMED_WITH_SEATS_20260707：已對照 Seats.vue 的 classHelperSeatPlan，學生三欄、音效、小組加分、兌換X置中都在這份檔案。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { CLOUD_DATA_UPDATED_EVENT } from '../services/cloudSync'
 
 // POINTS_REWARD_SYSTEM_20260707_NO_LIBRARY：積分獎勵獨立運作，班書借閱先不納入積分。
 const POINT_RECORDS_KEY = 'classAssistantPointRecordsV1'
@@ -120,13 +121,42 @@ function refreshSharedPointRecords() {
   records.value = loadJson(POINT_RECORDS_KEY, [])
 }
 
+
+// ✅ HUA_FIREBASE_POINTS_LIVE_SYNC_20260711：手機加減分後，教室桌機排行榜與學生分數立即更新。
+function refreshPointsFromCloud(event) {
+  const keys = new Set(event?.detail?.keys || [])
+
+  if (keys.size === 0 || keys.has(POINT_RECORDS_KEY)) {
+    records.value = loadJson(POINT_RECORDS_KEY, [])
+  }
+  if (keys.size === 0 || keys.has(POINT_REWARDS_KEY)) {
+    rewards.value = loadJson(POINT_REWARDS_KEY, defaultRewards)
+  }
+  if (keys.size === 0 || keys.has('students')) {
+    studentText.value = localStorage.getItem('students') || ''
+  }
+  if (keys.size === 0 || keys.has('className')) {
+    className.value = localStorage.getItem('className') || '班級'
+  }
+  if (keys.size === 0 || keys.has(POINT_SOUND_KEY)) {
+    audioEnabled.value = localStorage.getItem(POINT_SOUND_KEY) !== 'off'
+  }
+  if (keys.size === 0 || keys.has(POINT_GROUP_SIZE_KEY)) {
+    groupSize.value = Number(localStorage.getItem(POINT_GROUP_SIZE_KEY)) || 4
+  }
+
+  seatGroupRefreshSeed.value += 1
+}
+
 onMounted(() => {
   window.addEventListener('class-helper-points-updated', refreshSharedPointRecords)
+  window.addEventListener(CLOUD_DATA_UPDATED_EVENT, refreshPointsFromCloud)
   window.addEventListener('focus', refreshSharedPointRecords)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('class-helper-points-updated', refreshSharedPointRecords)
+  window.removeEventListener(CLOUD_DATA_UPDATED_EVENT, refreshPointsFromCloud)
   window.removeEventListener('focus', refreshSharedPointRecords)
 })
 

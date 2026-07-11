@@ -1,6 +1,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import {
+  cloudState,
+  copyCloudUid,
+  downloadFullBackup,
+  retryCloudSync,
+  signInCloud,
+  signOutCloud
+} from './services/cloudSync'
 
 // ✅ HUA_CORE_NAV_FIXED_ORDER_20260711：首頁、學生名單、班務分配、課表與作息、現在狀態固定在最上方；其餘功能才可拖曳排序。
 // ✅ HUA_SIDEBAR_GROUP_CLASS_AFFAIRS_20260710：班務分配為可展開群組。
@@ -9,6 +17,65 @@ const CLASS_AFFAIRS_OPEN_KEY = 'classAssistantClassAffairsOpenV1'
 const CORE_NAV_KEYS = ['dashboard', 'students', 'classAffairs', 'schedule', 'status']
 
 const route = useRoute()
+
+// ✅ HUA_FIREBASE_SYNC_PANEL_20260711：雲端登入、同步狀態、完整備份與 UID 複製入口。
+const cloudActionMessage = ref('')
+
+const cloudStatusLabel = computed(() => {
+  const labels = {
+    starting: '準備中',
+    'signed-out': '本機模式',
+    connecting: '連線中',
+    syncing: '同步中',
+    synced: '已同步',
+    offline: '離線',
+    'permission-denied': '待授權',
+    error: '連線失敗'
+  }
+  return labels[cloudState.status] || '雲端狀態'
+})
+
+const cloudStatusIcon = computed(() => {
+  if (cloudState.status === 'synced') return '☁️'
+  if (cloudState.status === 'syncing' || cloudState.status === 'connecting' || cloudState.status === 'starting') return '⏳'
+  if (cloudState.status === 'offline') return '📴'
+  if (cloudState.status === 'permission-denied') return '🔐'
+  if (cloudState.status === 'error') return '⚠️'
+  return '💾'
+})
+
+const cloudStatusClass = computed(() => `cloud-${cloudState.status}`)
+
+const formattedLastSync = computed(() => {
+  if (!cloudState.lastSyncAt) return ''
+  const date = new Date(cloudState.lastSyncAt)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('zh-TW', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+})
+
+async function handleCloudLogin() {
+  cloudActionMessage.value = ''
+  try {
+    await signInCloud()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function handleCopyUid() {
+  try {
+    const copied = await copyCloudUid()
+    cloudActionMessage.value = copied ? '已複製 UID' : '目前還沒有 UID'
+  } catch {
+    cloudActionMessage.value = '無法自動複製，請稍後再試'
+  }
+  setTimeout(() => { cloudActionMessage.value = '' }, 1800)
+}
 
 const defaultNavItems = [
   { key: 'dashboard', path: '/', label: '🏠 首頁', fixed: true },
@@ -222,6 +289,34 @@ function resetSidebarOrder() {
     </aside>
 
     <main class="main-content">
+      <section class="cloud-sync-panel" :class="cloudStatusClass" aria-live="polite">
+        <div class="cloud-sync-status">
+          <span class="cloud-sync-icon" aria-hidden="true">{{ cloudStatusIcon }}</span>
+          <div>
+            <strong>{{ cloudStatusLabel }}</strong>
+            <small>{{ cloudState.message }}</small>
+            <small v-if="formattedLastSync && cloudState.user">最後同步：{{ formattedLastSync }}</small>
+          </div>
+        </div>
+
+        <div class="cloud-sync-actions">
+          <button v-if="!cloudState.user" type="button" class="cloud-primary-action" @click="handleCloudLogin">
+            使用 Google 登入
+          </button>
+          <template v-else>
+            <button type="button" class="cloud-soft-action" @click="downloadFullBackup">下載完整備份</button>
+            <button v-if="cloudState.permissionDenied" type="button" class="cloud-primary-action" @click="handleCopyUid">
+              複製我的 UID
+            </button>
+            <button v-if="cloudState.status === 'error' || cloudState.status === 'offline'" type="button" class="cloud-soft-action" @click="retryCloudSync">
+              重新連線
+            </button>
+            <button type="button" class="cloud-text-action" @click="signOutCloud">登出</button>
+          </template>
+        </div>
+        <span v-if="cloudActionMessage" class="cloud-action-message">{{ cloudActionMessage }}</span>
+      </section>
+
       <RouterView />
     </main>
 

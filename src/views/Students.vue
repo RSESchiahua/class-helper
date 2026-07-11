@@ -1,9 +1,30 @@
 <script setup>
 // ✅ HUA_STUDENTS_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { CLOUD_DATA_UPDATED_EVENT } from '../services/cloudSync'
 
 const className = ref(localStorage.getItem('className') || '')
 const studentText = ref(localStorage.getItem('students') || '')
+
+
+// ✅ HUA_FIREBASE_STUDENTS_LIVE_SYNC_20260711：名單與班級名稱可在手機、桌機共用。
+function refreshStudentsFromCloud(event) {
+  const keys = new Set(event?.detail?.keys || [])
+  if (keys.size === 0 || keys.has('className')) {
+    className.value = localStorage.getItem('className') || ''
+  }
+  if (keys.size === 0 || keys.has('students')) {
+    studentText.value = localStorage.getItem('students') || ''
+  }
+}
+
+onMounted(() => {
+  window.addEventListener(CLOUD_DATA_UPDATED_EVENT, refreshStudentsFromCloud)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(CLOUD_DATA_UPDATED_EVENT, refreshStudentsFromCloud)
+})
 
 function parseStudentLine(line, index) {
   const text = line.trim()
