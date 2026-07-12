@@ -1,7 +1,8 @@
 <script setup>
+// ✅ HUA_FIRST_RUN_FIREBASE_WIZARD_AUTO_OPEN_20260712：首次選擇個人 Firebase 後直接開啟設定精靈。
 // ✅ HUA_SAFARI_FIREBASE_POPUP_FEEDBACK_20260712：登入按下後立即顯示狀態，並清楚回報 Safari 彈窗阻擋。
 // ✅ HUA_FIREBASE_SETUP_SMOOTH_FLOW_20260712：整段 Config 可直接貼、已登入不重複跳窗、成功後清楚引導同步驗收。
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   classLifecycleStatus,
   endCurrentClass,
@@ -154,6 +155,16 @@ function closeWizard() {
   persistWizard()
   wizardOpen.value = false
 }
+
+const FIRST_RUN_WIZARD_FLAG = 'classHelperOpenFirebaseWizardV1'
+
+onMounted(() => {
+  if (localStorage.getItem(FIRST_RUN_WIZARD_FLAG) !== 'true') return
+  localStorage.removeItem(FIRST_RUN_WIZARD_FLAG)
+  wizard.currentStep = firebaseConfigured.value ? 7 : Math.max(1, wizard.currentStep || 1)
+  persistWizard()
+  wizardOpen.value = true
+})
 
 function goToStep(step) {
   wizardMessage.value = ''

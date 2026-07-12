@@ -3628,3 +3628,48 @@ body {
     max-width: none;
   }
 }
+
+
+/* ✅ HUA_FIRST_RUN_STORAGE_CHOICE_STYLE_20260712
+   新裝置第一次開啟：本機／個人 Firebase 兩張並列選擇卡；手機自動直排。 */
+.first-run-storage-choice {
+  z-index: 1600;
+}
+
+.first-run-storage-choice .storage-choice-modal {
+  width: min(820px, 96vw);
+}
+
+.first-run-storage-choice .storage-option-card {
+  cursor: pointer;
+}
+
+.storage-option-title-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+}
+
+.storage-option-title-row .storage-option-icon {
+  font-size: 38px;
+}
+
+.first-run-storage-choice .storage-option-card em {
+  margin-top: auto;
+}
+
+@media (max-width: 760px) {
+  .first-run-storage-choice .storage-choice-modal {
+    margin: auto 0;
+  }
+
+  .storage-option-title-row {
+    min-height: 44px;
+  }
+
+  .storage-option-title-row .storage-option-icon {
+    font-size: 32px;
+  }
+}

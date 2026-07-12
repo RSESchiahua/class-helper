@@ -1,7 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { CLOUD_DATA_UPDATED_EVENT } from './services/cloudSync'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  CLOUD_DATA_UPDATED_EVENT,
+  chooseLocalStorageMode
+} from './services/cloudSync'
+import { STORAGE_MODE_KEY, setStorageMode } from './services/dataCenter'
 
 // ✅ HUA_CLOUD_REFRESH_ROUTER_VIEW_20260712：雲端資料更新後重建目前功能頁，讓所有 localStorage 畫面立即刷新。
 // ✅ HUA_DATA_CENTER_SPRINT1_APP_20260712：同步與備份入口集中到資料中心；首頁不再顯示共用 Firebase 面板。
@@ -12,6 +16,36 @@ const CLASS_AFFAIRS_OPEN_KEY = 'classAssistantClassAffairsOpenV1'
 const CORE_NAV_KEYS = ['dashboard', 'students', 'classAffairs', 'schedule', 'status', 'dataCenter']
 
 const route = useRoute()
+const router = useRouter()
+
+// ✅ HUA_FIRST_RUN_STORAGE_CHOICE_RESTORED_20260712：新裝置第一次開啟時，必須先選擇本機模式或個人 Firebase。
+const FIRST_RUN_WIZARD_FLAG = 'classHelperOpenFirebaseWizardV1'
+const storageChoiceOpen = ref(localStorage.getItem(STORAGE_MODE_KEY) === null)
+const storageChoiceBusy = ref(false)
+
+async function chooseFirstRunLocalMode() {
+  if (storageChoiceBusy.value) return
+  storageChoiceBusy.value = true
+  try {
+    await chooseLocalStorageMode()
+    storageChoiceOpen.value = false
+  } finally {
+    storageChoiceBusy.value = false
+  }
+}
+
+async function chooseFirstRunFirebaseMode() {
+  if (storageChoiceBusy.value) return
+  storageChoiceBusy.value = true
+  try {
+    setStorageMode('firebase')
+    localStorage.setItem(FIRST_RUN_WIZARD_FLAG, 'true')
+    storageChoiceOpen.value = false
+    await router.push('/data-center')
+  } finally {
+    storageChoiceBusy.value = false
+  }
+}
 
 // ✅ HUA_FIREBASE_WIZARD_APP_20260712：個人 Firebase 與備份集中於『資料與同步』頁，App 僅負責導覽與共用版面。
 const defaultNavItems = [
@@ -244,6 +278,44 @@ function resetSidebarOrder() {
     <main class="main-content">
       <RouterView :key="dataRefreshKey" />
     </main>
+
+    <div v-if="storageChoiceOpen" class="storage-choice-overlay first-run-storage-choice">
+      <section class="storage-choice-modal" role="dialog" aria-modal="true" aria-labelledby="first-run-storage-title" aria-describedby="first-run-storage-description">
+        <div class="storage-choice-heading">
+          <span aria-hidden="true">🗂️</span>
+          <div>
+            <h2 id="first-run-storage-title">第一次使用，請選擇資料儲存方式</h2>
+            <p id="first-run-storage-description">兩種模式之後都能在「資料與同步」更改；班級助手不會替老師保管 Firebase 帳號或班級資料。</p>
+          </div>
+        </div>
+
+        <div class="storage-choice-grid">
+          <button
+            type="button"
+            class="storage-option-card"
+            :disabled="storageChoiceBusy"
+            @click="chooseFirstRunLocalMode"
+          >
+            <span class="storage-option-title-row"><span class="storage-option-icon" aria-hidden="true">💻</span><strong>本機模式</strong></span>
+            <small>不用登入，立刻開始使用；資料只存在這個瀏覽器。清除網站資料、換裝置或裝置故障時，資料可能遺失。</small>
+            <em>適合先試用或只用單一裝置</em>
+          </button>
+
+          <button
+            type="button"
+            class="storage-option-card cloud-option"
+            :disabled="storageChoiceBusy"
+            @click="chooseFirstRunFirebaseMode"
+          >
+            <span class="storage-option-title-row"><span class="storage-option-icon" aria-hidden="true">☁️</span><strong>個人 Firebase 模式</strong></span>
+            <small>由老師建立並管理自己的 Firebase，可在電腦、手機和平板同步。首次需要依設定精靈完成一次連線。</small>
+            <em>適合跨裝置與長期使用</em>
+          </button>
+        </div>
+
+        <p class="storage-choice-note">選擇本機模式不會鎖死功能；日後仍可前往「💾 資料與同步」啟用個人 Firebase。</p>
+      </section>
+    </div>
 
     <div v-if="showCredit" class="credit-overlay" @click.self="showCredit = false">
       <section class="credit-modal" role="dialog" aria-modal="true" aria-label="班級助手製作資訊">
