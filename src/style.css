@@ -3673,3 +3673,194 @@ body {
     font-size: 32px;
   }
 }
+
+
+/* ✅ HUA_MOBILE_FORM_AND_SEAT_FINAL_POLISH_20260712
+   手機最終修正：座位圖可左右滑動；iOS 日期與時間欄不再以原生最小寬度撐破卡片。 */
+.seat-map-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding-bottom: 8px;
+}
+
+.seat-map-canvas {
+  width: 100%;
+  min-width: 520px;
+}
+
+input[type="date"],
+input[type="time"] {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  /* 覆蓋舊版的 overflow:hidden，讓座位區能真正左右滑動。 */
+  .seat-plan-area {
+    overflow: visible !important;
+  }
+
+  .seat-map-scroll {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: thin;
+    touch-action: pan-x pan-y;
+  }
+
+  .seat-map-canvas {
+    width: max-content !important;
+    min-width: max(520px, 100%) !important;
+  }
+
+  .seat-map-canvas .board-label,
+  .seat-map-canvas .seat-grid-map {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .seat-map-canvas .seat-grid-map {
+    min-width: 520px !important;
+    gap: 8px !important;
+  }
+
+  .seat-map-canvas .class-seat {
+    min-width: 72px !important;
+    min-height: 64px !important;
+    font-size: 13px !important;
+    touch-action: manipulation;
+  }
+
+  /* Safari 的 date/time 控制項自帶較大的 intrinsic width，必須明確壓回容器內。 */
+  input[type="date"],
+  input[type="time"] {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 52px;
+    padding-inline: 12px;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .schedule-row,
+  .schedule-row > *,
+  .schedule-editor,
+  .schedule-editor label,
+  .borrow-form,
+  .borrow-form > *,
+  .borrow-form label {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .schedule-row input,
+  .schedule-row select,
+  .schedule-editor input,
+  .schedule-editor select,
+  .borrow-form input,
+  .borrow-form select {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ✅ HUA_APP_CHECK_SETUP_STYLE_20260712
+   App Check 設定狀態與 Site Key 欄位：桌機清楚、手機不爆框。 */
+.app-check-state {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #e3e8e5;
+  border-radius: 12px;
+  background: #f8faf9;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.app-check-state.pending {
+  border-color: #ead79d;
+  background: #fff9e8;
+  color: #7a5c17;
+}
+
+.app-check-state.ready {
+  border-color: #b9dfca;
+  background: #edf9f2;
+  color: #2f6f57;
+}
+
+.wizard-app-check-box {
+  display: grid;
+  gap: 10px;
+  margin: 2px 0 16px;
+  padding: 15px;
+  border: 1px solid #cfe4da;
+  border-radius: 16px;
+  background: #f5fbf8;
+}
+
+.wizard-app-check-box > div {
+  display: grid;
+  gap: 4px;
+}
+
+.wizard-app-check-box strong {
+  color: #2f6f57;
+  font-size: 16px;
+}
+
+.wizard-app-check-box span,
+.wizard-app-check-box small {
+  color: #667085;
+  font-weight: 720;
+  line-height: 1.6;
+}
+
+.wizard-app-check-box input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 13px;
+  border: 2px solid #dceee6;
+  border-radius: 13px;
+  background: #fff;
+  color: #243b53;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+}
+
+.wizard-app-check-box input:focus {
+  outline: none;
+  border-color: #6bbf95;
+  box-shadow: 0 0 0 3px rgba(107, 191, 149, .14);
+}
+
+@media (max-width: 760px) {
+  .app-check-state {
+    width: 100%;
+  }
+
+  .wizard-app-check-box {
+    padding: 13px;
+  }
+}

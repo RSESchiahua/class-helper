@@ -1,5 +1,5 @@
 <script setup>
-// ✅ HUA_STATUS_SUBJECT_PRESET_ICON_LINK_20260711：現在狀態沿用課表科目工具盤的科目名稱與圖示，並支援半天課與自訂時段。
+// ✅ HUA_STATUS_TIME_INPUT_MOBILE_FIT_20260712：現在狀態測試時間欄在手機 Safari 不再爆框。
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -754,6 +754,37 @@ function openFullscreen() {
 @media (prefers-reduced-motion: reduce) {
   .linked-status-hero.warning {
     animation: none;
+  }
+}
+
+
+/* ✅ HUA_STATUS_TIME_INPUT_MOBILE_FIT_STYLE_20260712 */
+.status-test-panel,
+.status-test-panel label {
+  min-width: 0;
+}
+
+.status-test-panel input[type="time"],
+.status-test-panel select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .status-test-panel {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .status-test-panel input[type="time"],
+  .status-test-panel select,
+  .status-test-panel button {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 }
 </style>

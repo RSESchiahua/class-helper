@@ -1,5 +1,5 @@
 <script setup>
-// ✅ HUA_SEATS_ONE_SCREEN_MOBILE_REVIEW_20260710：座位安排頁由全域 CSS 控制桌機一頁式與手機可橫向檢視。
+// ✅ HUA_SEATS_HORIZONTAL_SCROLL_20260712：手機版座位圖保留可點擊尺寸，黑板至佈告欄區塊可左右滑動。
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperSeatPlan'
@@ -143,14 +143,18 @@ function resetPlan() {
           <div class="toolbar-group"><button @click="markLeader('組長')">⭐ 組長</button><button @click="markLeader('排長')">📍 排長</button></div>
         </div>
 
-        <div class="board-label">黑板</div>
-        <div class="seat-grid-map" :style="gridStyle">
-          <button v-for="seat in seats" :key="seat.id" class="class-seat" :class="{ selected: selectedSeats.has(seat.id), empty: !seat.student }" :style="groupStyle(seat)" @click="toggleSeatSelect(seat)" @dragover.prevent @drop="dropToSeat($event, seat)" @dblclick="clearSeat(seat)">
-            <span v-if="seat.leader" class="leader-tag">{{ seat.leader }}</span>
-            <strong>{{ seat.student || '空位' }}</strong>
-          </button>
+        <div class="seat-map-scroll" aria-label="座位圖，可左右滑動">
+          <div class="seat-map-canvas">
+            <div class="board-label">黑板</div>
+            <div class="seat-grid-map" :style="gridStyle">
+              <button v-for="seat in seats" :key="seat.id" class="class-seat" :class="{ selected: selectedSeats.has(seat.id), empty: !seat.student }" :style="groupStyle(seat)" @click="toggleSeatSelect(seat)" @dragover.prevent @drop="dropToSeat($event, seat)" @dblclick="clearSeat(seat)">
+                <span v-if="seat.leader" class="leader-tag">{{ seat.leader }}</span>
+                <strong>{{ seat.student || '空位' }}</strong>
+              </button>
+            </div>
+            <div class="board-label bulletin">佈告欄</div>
+          </div>
         </div>
-        <div class="board-label bulletin">佈告欄</div>
       </main>
     </section>
   </div>

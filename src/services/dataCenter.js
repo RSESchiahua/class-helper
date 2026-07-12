@@ -1,5 +1,7 @@
 // ✅ HUA_CLASS_DATA_SYNC_MANIFEST_20260712：班級資料白名單、備份、結束班級與個人 Firebase 同步共用核心。
 // ✅ HUA_FIREBASE_CONFIG_FULL_SNIPPET_PARSER_20260712：可直接貼上 Firebase 完整 SDK 程式碼，自動找出 firebaseConfig。
+// ✅ HUA_APP_CHECK_PERSONAL_SITE_KEY_STORAGE_20260712：每位老師可在自己的裝置保存自己的 App Check Site Key，不集中代管、不納入班級備份。
+// ✅ HUA_FIREBASE_ACCOUNT_BOUNDARY_GUARD_20260712：記住上一個雲端身分，避免同一裝置切換帳號時誤把班級資料上傳到別人的 Firebase。
 export const STORAGE_MODE_KEY = 'classHelperStorageModeV3'
 export const CLASS_PROFILE_KEY = 'classHelperClassProfileV1'
 export const LEGACY_CLASS_ARCHIVES_KEY = 'classHelperClassArchivesV1'
@@ -7,6 +9,9 @@ export const FIREBASE_CONFIG_KEY = 'classHelperPersonalFirebaseConfigV1'
 export const FIREBASE_WIZARD_KEY = 'classHelperFirebaseWizardV1'
 export const FIREBASE_TEST_KEY = 'classHelperFirebaseTestV1'
 export const LOCAL_RISK_ACK_KEY = 'classHelperLocalRiskAcknowledgedV1'
+export const LAST_CLOUD_IDENTITY_KEY = 'classHelperLastCloudIdentityV1'
+
+const MAX_BACKUP_FILE_BYTES = 8 * 1024 * 1024
 
 // 這些是「目前班級是誰、發生過什麼」的資料；結束班級時會清除或重設。
 const EXACT_CLASS_DATA_KEYS = new Set([
@@ -93,6 +98,24 @@ export function setStorageMode(mode) {
   const normalized = mode === 'firebase' ? 'firebase' : 'local'
   localStorage.setItem(STORAGE_MODE_KEY, normalized)
   return normalized
+}
+
+export function getLastCloudIdentity() {
+  const saved = safeJson(localStorage.getItem(LAST_CLOUD_IDENTITY_KEY), null)
+  if (!saved || typeof saved !== 'object') return null
+  const uid = String(saved.uid || '').trim()
+  const projectId = String(saved.projectId || '').trim()
+  if (!uid || !projectId) return null
+  return { uid, projectId, updatedAt: String(saved.updatedAt || '') }
+}
+
+export function saveLastCloudIdentity(identity) {
+  const uid = String(identity?.uid || '').trim()
+  const projectId = String(identity?.projectId || '').trim()
+  if (!uid || !projectId) return null
+  const clean = { uid, projectId, updatedAt: new Date().toISOString() }
+  localStorage.setItem(LAST_CLOUD_IDENTITY_KEY, JSON.stringify(clean))
+  return clean
 }
 
 export function getClassProfile() {
@@ -289,6 +312,7 @@ function sanitizeImportedClassData(rawData) {
 export async function importFullBackup(file, { replace = false } = {}) {
   if (typeof File !== 'undefined' && !(file instanceof File)) throw new Error('請選擇有效的備份檔')
   if (!file || typeof file.text !== 'function') throw new Error('請選擇有效的備份檔')
+  if (Number(file.size || 0) > MAX_BACKUP_FILE_BYTES) throw new Error('備份檔超過 8 MB，為避免瀏覽器卡住，請確認檔案是否正確')
 
   const parsed = safeJson(await file.text(), null)
   const acceptedFormat = parsed?.format === 'class-helper-class-backup' || parsed?.format === 'class-helper-backup'
@@ -431,11 +455,11 @@ function extractBalancedObject(text, openingBraceIndex) {
 }
 
 function extractFirebaseStringFields(text) {
-  const allowed = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId']
+  const allowed = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId', 'appCheckSiteKey']
   const result = {}
 
   for (const key of allowed) {
-    const pattern = new RegExp(`(?:^|[,{\\s])${key}\\s*:\s*([\"'\`])([\\s\\S]*?)\\1`)
+    const pattern = new RegExp(`(?:^|[,{\\s])${key}\\s*:\\s*([\"'\`])([\\s\\S]*?)\\1`)
     const match = text.match(pattern)
     if (match) result[key] = match[2].trim()
   }
@@ -486,14 +510,41 @@ export function getPersonalFirebaseConfig() {
   return safeJson(localStorage.getItem(FIREBASE_CONFIG_KEY), null)
 }
 
-export function savePersonalFirebaseConfig(configOrText) {
-  const config = parseFirebaseConfig(configOrText)
+export function savePersonalFirebaseConfig(configOrText, options = {}) {
+  const parsed = parseFirebaseConfig(configOrText)
+  const config = {
+    ...parsed,
+    appCheckSiteKey: String(options?.appCheckSiteKey || parsed?.appCheckSiteKey || '').trim()
+  }
   const required = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'appId']
   const missing = required.filter(key => !String(config?.[key] || '').trim())
   if (missing.length) throw new Error(`Firebase 設定缺少：${missing.join('、')}`)
-  const allowed = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId']
-  const clean = Object.fromEntries(allowed.filter(key => config[key]).map(key => [key, String(config[key]).trim()]))
+
+  const allowed = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId', 'appCheckSiteKey']
+  const clean = Object.fromEntries(
+    allowed
+      .filter(key => config[key] !== undefined && config[key] !== null && String(config[key]).trim())
+      .map(key => [key, String(config[key]).trim()])
+  )
   clean.databaseURL = clean.databaseURL.replace(/\/$/, '')
+
+  if (!/^[a-z0-9-]+$/i.test(clean.projectId)) throw new Error('projectId 格式不正確')
+  if (!/^[a-z0-9.-]+$/i.test(clean.authDomain)) throw new Error('authDomain 格式不正確')
+  if (/\s/.test(clean.apiKey) || /\s/.test(clean.appId)) throw new Error('Firebase Config 內含不應出現的空白')
+  if (clean.appCheckSiteKey && !/^[A-Za-z0-9_-]{20,200}$/.test(clean.appCheckSiteKey)) {
+    throw new Error('App Check Site Key 格式不正確；請只貼上金鑰 ID，不要貼 script 程式碼')
+  }
+
+  let databaseUrl
+  try {
+    databaseUrl = new URL(clean.databaseURL)
+  } catch {
+    throw new Error('databaseURL 格式不正確')
+  }
+  const validDatabaseHost = /\.(firebaseio\.com|firebasedatabase\.app)$/i.test(databaseUrl.hostname)
+  if (databaseUrl.protocol !== 'https:' || !validDatabaseHost) {
+    throw new Error('databaseURL 必須是 Firebase Realtime Database 的 https 網址')
+  }
 
   const previous = getPersonalFirebaseConfig()
   const changedProject = previous && (
@@ -501,10 +552,12 @@ export function savePersonalFirebaseConfig(configOrText) {
     previous.appId !== clean.appId ||
     previous.databaseURL !== clean.databaseURL
   )
-  if (changedProject) {
+  const changedAppCheck = previous && String(previous.appCheckSiteKey || '') !== String(clean.appCheckSiteKey || '')
+  if (changedProject || changedAppCheck) {
     localStorage.removeItem(FIREBASE_TEST_KEY)
     localStorage.removeItem('classHelperCloudSyncMetaV1')
     localStorage.removeItem('classHelperCloudForceUploadPendingV1')
+    // LAST_CLOUD_IDENTITY_KEY 刻意保留：下次登入時用來阻止跨帳號資料誤上傳。
   }
 
   localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(clean))

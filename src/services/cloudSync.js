@@ -1,15 +1,20 @@
 // ✅ HUA_PERSONAL_FIREBASE_REAL_SYNC_20260712：本機優先、個人 Firebase 即時同步、版本衝突保護與跨裝置更新。
+// ✅ HUA_CLOUD_IDENTITY_SWITCH_PROTECTION_20260712：切換 Firebase 專案或 Google 帳號時不再自動上傳本機班級資料，必須由老師明確選擇。
+// ✅ HUA_APP_CHECK_SYNC_ERROR_GUIDANCE_20260712：App Check 權杖或強制狀態異常時，顯示可理解的修正提示。
 import { reactive, readonly } from 'vue'
 import { get, onValue, ref, runTransaction } from 'firebase/database'
 import {
   exportFullBackup,
   getClassDataSummaryFromObject,
+  getLastCloudIdentity,
   getPersonalFirebaseConfig,
   getStorageMode,
   hasMeaningfulClassData,
   isClassDataKey,
   readClassData,
   replaceClassData,
+  sanitizeClassData,
+  saveLastCloudIdentity,
   setStorageMode
 } from './dataCenter'
 import {
@@ -76,6 +81,19 @@ function nowIso() {
   return new Date().toISOString()
 }
 
+function isAppCheckError(error) {
+  const code = String(error?.code || '')
+  const message = String(error?.message || '')
+  return /app.?check|recaptcha/i.test(`${code} ${message}`)
+}
+
+function friendlyCloudError(error, deniedMessage = 'Firebase 拒絕存取，請檢查安全規則與 App Check') {
+  const denied = error?.code === 'PERMISSION_DENIED' || error?.code === 'permission-denied'
+  if (isAppCheckError(error)) return 'App Check 驗證失敗，請確認 Site Key、正式網域與 Firebase App Check 設定'
+  if (denied) return deniedMessage
+  return error?.message || '無法啟動雲端同步'
+}
+
 function safeJson(raw, fallback = null) {
   try {
     const value = JSON.parse(raw || '')
@@ -123,7 +141,7 @@ function payloadHash(payload) {
 
 function normalizeRemotePayload(value) {
   if (!value || typeof value !== 'object') return null
-  const classData = canonicalData(value.classData || {})
+  const classData = canonicalData(sanitizeClassData(value.classData || {}))
   return {
     schemaVersion: Number(value.schemaVersion) || CLOUD_SCHEMA_VERSION,
     revision: Math.max(0, Number(value.revision) || 0),
@@ -164,6 +182,7 @@ function saveSyncMeta(remotePayload, localHash = payloadHash(remotePayload)) {
     lastSyncAt: nowIso()
   }
   localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta))
+  saveLastCloudIdentity({ uid: state.uid, projectId: state.projectId })
   setState({ lastSyncAt: meta.lastSyncAt })
   return meta
 }
@@ -433,6 +452,30 @@ async function alignInitialData(remotePayload) {
   const localHash = hashClassData(localData)
   const localMeaningful = hasMeaningfulClassData(localData)
   const meta = getIdentityMeta()
+  const previousIdentity = getLastCloudIdentity()
+  const identityChanged = Boolean(
+    previousIdentity?.uid &&
+    previousIdentity?.projectId &&
+    (previousIdentity.uid !== state.uid || previousIdentity.projectId !== state.projectId)
+  )
+
+  // 同一瀏覽器若改連另一個 Firebase／Google 帳號，舊班級資料不能自動上傳。
+  // 即使新雲端是空的，也交由老師明確選擇「保留本機」或「採用雲端」。
+  if (identityChanged && localMeaningful) {
+    const safeRemotePayload = remotePayload || {
+      schemaVersion: CLOUD_SCHEMA_VERSION,
+      revision: 0,
+      updatedAt: '',
+      updatedBy: '',
+      dataHash: hashClassData({}),
+      classData: {}
+    }
+    setConflict(safeRemotePayload)
+    setState({
+      message: '偵測到這台裝置曾連接另一個 Firebase 或 Google 帳號。為避免班級資料混用，請先確認要保留本機資料或採用目前帳號的雲端資料。'
+    })
+    return
+  }
 
   if (!remotePayload) {
     if (localMeaningful) await uploadLocalSnapshot({ force: true })
@@ -520,7 +563,7 @@ function startRealtimeListener(token) {
     const denied = error?.code === 'PERMISSION_DENIED' || error?.code === 'permission-denied'
     setState({
       status: 'error',
-      message: denied ? 'Firebase 拒絕存取，請檢查安全規則' : (error?.message || '雲端監聽失敗'),
+      message: friendlyCloudError(error, 'Firebase 拒絕存取；請檢查安全規則，若已開啟 App Check 強制執行也請確認權杖'),
       permissionDenied: denied,
       localOnly: false
     })
@@ -596,7 +639,7 @@ async function connectCloud({ interactive = false } = {}) {
     const denied = error?.code === 'PERMISSION_DENIED' || error?.code === 'permission-denied'
     setState({
       status: navigator.onLine ? 'error' : 'offline',
-      message: denied ? 'Firebase 拒絕存取，請檢查安全規則' : (error?.message || '無法啟動雲端同步'),
+      message: friendlyCloudError(error),
       permissionDenied: denied,
       localOnly: false
     })

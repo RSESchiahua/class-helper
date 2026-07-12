@@ -5,7 +5,33 @@
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid && auth.uid === 'YOUR_FIREBASE_UID'",
-        ".write": "auth != null && auth.uid === $uid && auth.uid === 'YOUR_FIREBASE_UID'"
+        ".write": "auth != null && auth.uid === $uid && auth.uid === 'YOUR_FIREBASE_UID'",
+        "systemChecks": {
+          "wizard": {
+            ".validate": "newData.hasChildren(['ok', 'checkedAt', 'projectId'])",
+            "ok": { ".validate": "newData.isBoolean()" },
+            "checkedAt": { ".validate": "newData.isString()" },
+            "projectId": { ".validate": "newData.isString()" },
+            "$other": { ".validate": false }
+          },
+          "$other": { ".validate": false }
+        },
+        "classHelper": {
+          "currentClass": {
+            ".validate": "newData.hasChildren(['schemaVersion', 'revision', 'updatedAt', 'updatedBy', 'dataHash'])",
+            "schemaVersion": { ".validate": "newData.isNumber() && newData.val() >= 1" },
+            "revision": { ".validate": "newData.isNumber() && newData.val() >= 1" },
+            "updatedAt": { ".validate": "newData.isString()" },
+            "updatedBy": { ".validate": "newData.isString()" },
+            "dataHash": { ".validate": "newData.isString()" },
+            "classData": {
+              "$key": { ".validate": "newData.isString()" }
+            },
+            "$other": { ".validate": false }
+          },
+          "$other": { ".validate": false }
+        },
+        "$other": { ".validate": false }
       }
     }
   }

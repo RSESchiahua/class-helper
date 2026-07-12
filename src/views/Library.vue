@@ -1,5 +1,5 @@
 <script setup>
-// ✅ HUA_LIBRARY_ONE_SCREEN_MOBILE_REVIEW_20260710：此頁已加入桌機一頁式與手機響應式檢查。
+// ✅ HUA_LIBRARY_IOS_DATE_FIT_20260712：修正 iPhone Safari 借閱日期欄超出卡片寬度。
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperLibraryLoans'
@@ -211,7 +211,7 @@ function playReturnSound() {
 
         <label>
           <span>借閱日期</span>
-          <input type="date" v-model="borrowDate" />
+          <input class="library-date-input" type="date" v-model="borrowDate" />
         </label>
 
         <button class="primary" @click="addLoan">📗 借出</button>
@@ -572,4 +572,42 @@ button {
   }
 }
 
+
+
+/* ✅ HUA_LIBRARY_IOS_DATE_FIT_STYLE_20260712 */
+.borrow-form,
+.borrow-form label {
+  min-width: 0;
+}
+
+.library-date-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+@media (max-width: 760px) {
+  .borrow-form {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .borrow-form > *,
+  .borrow-form input,
+  .borrow-form select,
+  .library-date-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .library-date-input {
+    min-height: 52px;
+    padding-inline: 12px;
+  }
+}
 </style>

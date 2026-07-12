@@ -2,6 +2,7 @@
 // ✅ HUA_FIRST_RUN_FIREBASE_WIZARD_AUTO_OPEN_20260712：首次選擇個人 Firebase 後直接開啟設定精靈。
 // ✅ HUA_SAFARI_FIREBASE_POPUP_FEEDBACK_20260712：登入按下後立即顯示狀態，並清楚回報 Safari 彈窗阻擋。
 // ✅ HUA_FIREBASE_SETUP_SMOOTH_FLOW_20260712：整段 Config 可直接貼、已登入不重複跳窗、成功後清楚引導同步驗收。
+// ✅ HUA_APP_CHECK_SETUP_UI_20260712：個人 Firebase 設定可保存自己的 App Check Site Key，並顯示權杖測試結果。
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
   classLifecycleStatus,
@@ -23,7 +24,11 @@ import {
   savePersonalFirebaseConfig,
   setStorageMode
 } from '../services/dataCenter'
-import { testTeacherFirebase } from '../services/firebase'
+import {
+  getTeacherAppCheckSource,
+  hasTeacherAppCheckConfig,
+  testTeacherFirebase
+} from '../services/firebase'
 import {
   chooseLocalStorageMode,
   cloudState,
@@ -50,8 +55,16 @@ const endClassBackupDownloaded = ref(false)
 const endClassBusy = ref(false)
 const clearedDataItems = getEndClassClearedData()
 const preservedSettingItems = getEndClassPreservedSettings()
-const firebaseConfigText = ref(getPersonalFirebaseConfig() ? JSON.stringify(getPersonalFirebaseConfig(), null, 2) : '')
-const firebaseConfigured = ref(Boolean(getPersonalFirebaseConfig()))
+const initialFirebaseConfig = getPersonalFirebaseConfig()
+function configForTextarea(config) {
+  if (!config) return ''
+  const { appCheckSiteKey, ...firebaseConfig } = config
+  return JSON.stringify(firebaseConfig, null, 2)
+}
+const activeFirebaseConfig = ref(initialFirebaseConfig)
+const firebaseConfigText = ref(configForTextarea(initialFirebaseConfig))
+const appCheckSiteKeyText = ref(initialFirebaseConfig?.appCheckSiteKey || '')
+const firebaseConfigured = ref(Boolean(initialFirebaseConfig))
 const wizardOpen = ref(false)
 const wizardBusy = ref(false)
 const wizard = reactive(getFirebaseWizardProgress())
@@ -59,6 +72,13 @@ const testResult = ref(getFirebaseTestResult())
 const rulesCopied = ref(false)
 const syncBusy = ref(false)
 const wizardMessage = ref('')
+const appCheckConfigured = computed(() => hasTeacherAppCheckConfig(activeFirebaseConfig.value || {}))
+const appCheckSource = computed(() => getTeacherAppCheckSource(activeFirebaseConfig.value || {}))
+const appCheckStatusText = computed(() => {
+  if (testResult.value?.appCheckTokenVerified) return testResult.value.appCheckDebug ? '🛡️ App Check Debug 驗證成功' : '🛡️ App Check 驗證成功'
+  if (appCheckConfigured.value) return '🛡️ App Check 已設定，請重新測試連線'
+  return 'App Check 尚未設定（啟用強制執行前必須完成）'
+})
 
 const FIREBASE_RULES = `{
   "rules": {
@@ -296,15 +316,21 @@ async function handleEndClass() {
 
 function saveFirebaseConfigOnly() {
   try {
-    const clean = savePersonalFirebaseConfig(firebaseConfigText.value)
-    firebaseConfigText.value = JSON.stringify(clean, null, 2)
+    const clean = savePersonalFirebaseConfig(firebaseConfigText.value, {
+      appCheckSiteKey: appCheckSiteKeyText.value
+    })
+    activeFirebaseConfig.value = clean
+    firebaseConfigText.value = configForTextarea(clean)
+    appCheckSiteKeyText.value = clean.appCheckSiteKey || ''
     firebaseConfigured.value = true
     testResult.value = getFirebaseTestResult()
     if (!wizard.completedSteps.includes(6)) wizard.completedSteps.push(6)
     wizard.currentStep = 7
-    wizardMessage.value = '✅ Firebase Config 已保存。現在可以登入 Google 並測試連線。'
+    wizardMessage.value = appCheckConfigured.value
+      ? '✅ Firebase Config 與 App Check 設定已保存。現在可以登入 Google 並測試權杖與資料庫連線。'
+      : '✅ Firebase Config 已保存。若日後啟用 App Check 強制執行，請先補上 Site Key；現在可以登入 Google 並測試連線。'
     persistWizard()
-    showNotice('個人 Firebase 設定已儲存在這台裝置')
+    showNotice(appCheckConfigured.value ? 'Firebase 與 App Check 設定已儲存在這台裝置' : '個人 Firebase 設定已儲存在這台裝置')
     return clean
   } catch (error) {
     const message = error?.message || 'Firebase Config 格式錯誤'
@@ -346,7 +372,9 @@ async function runConnectionTest() {
       'auth/popup-closed-by-user': '你關閉了 Google 登入視窗，資料沒有變動。',
       'auth/popup-blocked': 'Safari 阻擋了 Google 登入視窗。請允許 localhost 的彈出式視窗後再試。',
       'auth/cancelled-popup-request': '上一個登入視窗尚未完成，請稍等一下再按一次。',
-      'PERMISSION_DENIED': '資料庫拒絕存取，請檢查第 5 步安全規則。'
+      'PERMISSION_DENIED': '資料庫拒絕存取，請檢查第 5 步安全規則與 App Check 強制狀態。',
+      'appCheck/recaptcha-error': 'App Check 無法驗證目前網域，請檢查 reCAPTCHA Enterprise 網域與 Site Key。',
+      'appCheck/fetch-status-error': 'App Check 無法取得權杖，請稍後重試並檢查 Site Key。'
     }
     const message = messages[error?.code] || messages[error?.message] || error?.message || '連線測試失敗'
     wizardMessage.value = `⚠️ ${message}`
@@ -373,7 +401,9 @@ async function removeFirebaseConfig() {
     await chooseLocalStorageMode()
     removePersonalFirebaseConfig()
     storageMode.value = 'local'
+    activeFirebaseConfig.value = null
     firebaseConfigText.value = ''
+    appCheckSiteKeyText.value = ''
     firebaseConfigured.value = false
     testResult.value = null
     Object.assign(wizard, { currentStep: 1, completedSteps: [], acknowledged: false })
@@ -484,6 +514,7 @@ async function chooseConflictVersion(strategy) {
             <p>資料存放在老師自己建立、自己管理的 Firebase 專案。</p>
             <ul><li>可跨電腦與手機同步</li><li>容量與權限由老師本人管理</li><li>開發者無法查看或復原資料</li></ul>
             <span class="setup-state" :class="{ ready: testResult?.ok }">{{ testResult?.ok ? `✅ 已連線：${testResult.projectId}` : firebaseConfigured ? '設定已保存，尚未測試' : '尚未完成設定' }}</span>
+            <span class="app-check-state" :class="{ ready: testResult?.appCheckTokenVerified, pending: appCheckConfigured && !testResult?.appCheckTokenVerified }">{{ appCheckStatusText }}</span>
 
             <div class="firebase-sync-status" :class="syncStatusClass">
               <div class="firebase-sync-status-head">
@@ -635,8 +666,22 @@ async function chooseConflictVersion(strategy) {
           <template v-else-if="wizard.currentStep === 3"><h3>建立 Realtime Database</h3><ol><li>左側「建構」→「Realtime Database」。</li><li>按「建立資料庫」，地區選離自己較近的位置。</li><li>可先選鎖定模式；第 5 步會貼上正式安全規則。</li><li>建立後確認 Web App 設定中出現 <code>databaseURL</code>。</li></ol></template>
           <template v-else-if="wizard.currentStep === 4"><h3>啟用 Google 登入</h3><ol><li>左側「建構」→「Authentication」→「開始使用」。</li><li>在登入方式啟用「Google」。</li><li>填入專案支援信箱並儲存。</li><li>到「設定」→「已授權的網域」，加入你實際使用班級助手的網域；本機測試請加入 <code>localhost</code>（只填 localhost，不要貼完整網址或路徑）。</li></ol></template>
           <template v-else-if="wizard.currentStep === 5"><h3>貼上安全規則</h3><p>這份規則只允許已登入的老師讀寫自己 UID 路徑下的資料。</p><pre class="rules-box">{{ FIREBASE_RULES }}</pre><button type="button" class="data-secondary" @click="copyRules">{{ rulesCopied ? '✓ 已複製' : '複製安全規則' }}</button><ol><li>Realtime Database →「規則」。</li><li>全選舊內容，貼上上方規則。</li><li>確認沒有紅色錯誤後按「發布」。</li></ol></template>
-          <template v-else-if="wizard.currentStep === 6"><h3>貼上 Firebase Config</h3><p>可直接按 Firebase 右下角的複製按鈕，將包含 <code>import</code>、<code>firebaseConfig</code> 與 <code>initializeApp</code> 的整段程式碼全部貼上；班級助手會自動找出正確設定。</p><textarea v-model="firebaseConfigText" class="wizard-config-textarea" spellcheck="false" placeholder="const firebaseConfig = {\n  apiKey: '...',\n  authDomain: '...',\n  databaseURL: '...',\n  projectId: '...',\n  appId: '...'\n}"></textarea><button type="button" class="data-primary" @click="saveFirebaseConfigOnly">檢查並保存設定</button></template>
-          <template v-else><h3>登入並做一次安全測試</h3><p>首次登入可能會開啟 Google 帳號視窗；完成一次後，後續測試與同步會優先沿用目前登入狀態，不再反覆跳窗。測試會暫時在 <code>users／你的 UID／systemChecks</code> 寫入資料、讀回後立即刪除。</p><div v-if="testResult?.ok" class="wizard-success"><strong>✅ 測試成功</strong><span>{{ testResult.email }}</span><span>專案：{{ testResult.projectId }}</span><span>UID：{{ testResult.uid }}</span><small>下一步：按右下角「完成設定」，再回到個人 Firebase 卡片確認「同步完成」。</small></div><button type="button" class="data-primary" :disabled="wizardBusy" @click="runConnectionTest">{{ wizardBusy ? '正在確認連線…' : testResult?.ok ? '再次驗證連線' : '登入 Google 並測試' }}</button></template>
+          <template v-else-if="wizard.currentStep === 6">
+            <h3>貼上 Firebase Config 與 App Check</h3>
+            <p>可直接按 Firebase 右下角的複製按鈕，將包含 <code>import</code>、<code>firebaseConfig</code> 與 <code>initializeApp</code> 的整段程式碼全部貼上；班級助手會自動找出正確設定。</p>
+            <textarea v-model="firebaseConfigText" class="wizard-config-textarea" spellcheck="false" placeholder="const firebaseConfig = {\n  apiKey: '...',\n  authDomain: '...',\n  databaseURL: '...',\n  projectId: '...',\n  appId: '...'\n}"></textarea>
+            <div class="wizard-app-check-box">
+              <div>
+                <strong>🛡️ reCAPTCHA Enterprise Site Key</strong>
+                <span>啟用 App Check 時使用。這是可放在網頁前端的公開 Site Key，不是 Secret Key。</span>
+              </div>
+              <input v-model.trim="appCheckSiteKeyText" autocomplete="off" spellcheck="false" placeholder="例如：6Lc...（未啟用 App Check 可先留空）" />
+              <small v-if="appCheckSource === 'built-in'">目前的 <code>class-helper-2026</code> 專案已內建對應 Site Key，這一欄可留空。</small>
+              <small v-else>其他老師若使用自己的 Firebase，必須在自己的 App Check 建立 Site Key，並貼在這裡。</small>
+            </div>
+            <button type="button" class="data-primary" @click="saveFirebaseConfigOnly">檢查並保存設定</button>
+          </template>
+          <template v-else><h3>登入並做一次安全測試</h3><p>首次登入可能會開啟 Google 帳號視窗；完成一次後，後續測試與同步會優先沿用目前登入狀態，不再反覆跳窗。測試會暫時在 <code>users／你的 UID／systemChecks</code> 寫入資料、讀回後立即刪除。</p><div v-if="testResult?.ok" class="wizard-success"><strong>✅ 測試成功</strong><span>{{ testResult.email }}</span><span>專案：{{ testResult.projectId }}</span><span>UID：{{ testResult.uid }}</span><span>App Check：{{ testResult.appCheckTokenVerified ? (testResult.appCheckDebug ? 'Debug 權杖有效' : '正式權杖有效') : appCheckConfigured ? '尚未驗證' : '未設定' }}</span><small>下一步：按右下角「完成設定」，再回到個人 Firebase 卡片確認「同步完成」。</small></div><button type="button" class="data-primary" :disabled="wizardBusy" @click="runConnectionTest">{{ wizardBusy ? '正在確認連線…' : testResult?.ok ? '再次驗證連線' : '登入 Google 並測試' }}</button></template>
         </div>
 
         <footer class="wizard-footer"><button type="button" class="data-secondary" :disabled="wizard.currentStep === 1 || wizardBusy" @click="previousStep">上一步</button><span>可以關閉精靈，進度會保留。</span><button v-if="wizard.currentStep < 7" type="button" class="data-primary" :disabled="wizardBusy" @click="completeCurrentStep">我已完成，下一步</button><button v-else type="button" class="data-primary" :disabled="!testResult?.ok || wizardBusy" @click="closeWizard">完成設定</button></footer>

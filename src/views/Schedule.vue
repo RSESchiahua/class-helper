@@ -1,5 +1,6 @@
 <script setup>
 // ✅ HUA_SUBJECT_TOOL_UNIFORM_SIZE_20260711：科目分類框與科目按鍵統一尺寸，長科目名稱也能穩定置中顯示。
+// ✅ HUA_SCHEDULE_IOS_TIME_FIT_20260712：修正 iPhone Safari 作息起訖與快速設定時間欄超出卡片。
 import { computed, ref, watch } from 'vue'
 
 const STORAGE_KEY = 'classHelperWeeklyScheduleV1'
@@ -979,13 +980,13 @@ function getStatusFor(dayKey, minute) {
 
         <div v-if="showQuickSetup" class="quick-setup-panel">
           <div class="quick-form-grid">
-            <label><span>第一節開始</span><input v-model="quick.firstStart" type="time" /></label>
+            <label><span>第一節開始</span><input v-model="quick.firstStart" type="time" class="schedule-time-input" /></label>
             <label><span>每節課</span><div class="number-with-unit"><input v-model.number="quick.duration" type="number" min="1" max="120" /><b>分鐘</b></div></label>
             <label><span>一般下課</span><div class="number-with-unit"><input v-model.number="quick.breakMinutes" type="number" min="0" max="60" /><b>分鐘</b></div></label>
             <label><span>上午節數</span><input v-model.number="quick.morningCount" type="number" min="1" max="8" /></label>
             <label><span>大下課在第幾節後</span><input v-model.number="quick.longBreakAfter" type="number" min="0" :max="quick.morningCount" /></label>
             <label><span>大下課</span><div class="number-with-unit"><input v-model.number="quick.longBreakMinutes" type="number" min="0" max="90" /><b>分鐘</b></div></label>
-            <label><span>下午第一節開始</span><input v-model="quick.afternoonStart" type="time" /></label>
+            <label><span>下午第一節開始</span><input v-model="quick.afternoonStart" type="time" class="schedule-time-input" /></label>
             <label><span>下午節數</span><input v-model.number="quick.afternoonCount" type="number" min="0" max="8" /></label>
             <label><span>下午下課</span><div class="number-with-unit"><input v-model.number="quick.afternoonBreakMinutes" type="number" min="0" max="60" /><b>分鐘</b></div></label>
           </div>
@@ -1047,11 +1048,11 @@ function getStatusFor(dayKey, minute) {
             </label>
             <label>
               <span>開始</span>
-              <input v-model="period.start" type="time" />
+              <input v-model="period.start" type="time" class="schedule-time-input" />
             </label>
             <label>
               <span>結束</span>
-              <input v-model="period.end" type="time" />
+              <input v-model="period.end" type="time" class="schedule-time-input" />
             </label>
             <button type="button" class="delete-period-button" @click="deletePeriod(index)">刪除</button>
           </div>
@@ -1079,7 +1080,7 @@ function getStatusFor(dayKey, minute) {
           </label>
           <label>
             <span>時間</span>
-            <input v-model="previewTime" type="time" />
+            <input v-model="previewTime" type="time" class="schedule-time-input" />
           </label>
           <span v-if="previewHalfDay" class="preview-half-day-badge">半天課</span>
         </div>
@@ -1286,6 +1287,60 @@ function getStatusFor(dayKey, minute) {
   .preview-status-title { flex-direction: column; gap: 4px; }
   .preview-status-badges { width: 100%; }
   .preview-status-badges strong, .preview-status-badges span { width: 100%; border-radius: 14px; }
+}
+
+
+/* ✅ HUA_SCHEDULE_IOS_TIME_FIT_STYLE_20260712 */
+.time-setting-row,
+.time-setting-row > *,
+.time-setting-row label,
+.quick-form-grid,
+.quick-form-grid > *,
+.quick-form-grid label,
+.preview-controls,
+.preview-controls label {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.schedule-time-input {
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-time-input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .time-setting-row,
+  .quick-form-grid,
+  .preview-controls {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .time-setting-row label,
+  .quick-form-grid label,
+  .preview-controls label {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .schedule-time-input {
+    min-height: 52px;
+    padding: 10px 12px;
+    font-size: 16px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }
 </style>
 
