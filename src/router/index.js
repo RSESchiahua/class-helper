@@ -13,6 +13,7 @@ import Wheel from '../views/Wheel.vue'
 import Cleaning from '../views/Cleaning.vue'
 import Jobs from '../views/Jobs.vue'
 import Seats from '../views/Seats.vue'
+import DataCenter from '../views/DataCenter.vue'
 
 // ✅ HUA_SCHEDULE_ROUTE_STATUS_LINK_20260711：新增 /schedule 課表頁，與 Status.vue 共用作息資料。
 // ✅ HUA_STATUS_IS_MODES_ROUTE_CONFIRM_20260710：Status.vue 就是原本的 Modes／現在狀態頁，保留 /modes 自動轉址到 /status。
@@ -31,7 +32,9 @@ const routes = [
   { path: '/cleaning', component: Cleaning },
   { path: '/jobs', component: Jobs },
   { path: '/seats', component: Seats },
-  { path: '/wheel', component: Wheel }
+  { path: '/wheel', component: Wheel },
+  // ✅ HUA_DATA_CENTER_ROUTE_20260712：所有儲存、備份、班級生命週期與封存集中管理。
+  { path: '/data-center', component: DataCenter }
 ]
 
 export default createRouter({

@@ -1,768 +1,702 @@
-// ✅ HUA_SYNC_CHOICE_OPT_IN_CORE_20260712：老師可自行選擇本機儲存或 Google 雲端同步；切換模式不會刪除既有資料。
+// ✅ HUA_PERSONAL_FIREBASE_REAL_SYNC_20260712：本機優先、個人 Firebase 即時同步、版本衝突保護與跨裝置更新。
 import { reactive, readonly } from 'vue'
+import { get, onValue, ref, runTransaction } from 'firebase/database'
 import {
-  getRedirectResult,
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  signOut
-} from 'firebase/auth'
+  exportFullBackup,
+  getClassDataSummaryFromObject,
+  getPersonalFirebaseConfig,
+  getStorageMode,
+  hasMeaningfulClassData,
+  isClassDataKey,
+  readClassData,
+  replaceClassData,
+  setStorageMode
+} from './dataCenter'
 import {
-  get,
-  onValue,
-  ref as databaseRef,
-  set,
-  update
-} from 'firebase/database'
-import {
-  firebaseAuth,
-  firebaseDatabase,
-  googleProvider,
-  prepareFirebaseAuth
+  initializeTeacherFirebase,
+  signInTeacherFirebase,
+  signOutTeacherFirebase,
+  waitForTeacherAuth
 } from './firebase'
 
 export const CLOUD_DATA_UPDATED_EVENT = 'class-helper-cloud-data-updated'
-const LOCAL_STORAGE_CHANGED_EVENT = 'class-helper-local-storage-changed'
-const DEVICE_ID_KEY = 'classHelperCloudDeviceIdV1'
-const LAST_SYNC_KEY = 'classHelperCloudLastSyncV1'
-const DIRTY_KEYS_KEY = 'classHelperCloudDirtyKeysV1'
-const SYNC_MODE_KEY = 'classHelperCloudSyncModeV2'
-const CLOUD_RESERVED_PREFIX = 'classHelperCloud'
-
-const nativeStorageSetItem = Storage.prototype.setItem
-const nativeStorageRemoveItem = Storage.prototype.removeItem
-const nativeStorageClear = Storage.prototype.clear
-
-function readSavedSyncMode() {
-  const saved = localStorage.getItem(SYNC_MODE_KEY)
-  return saved === 'local' || saved === 'cloud' ? saved : 'unselected'
-}
-
-const initialSyncMode = readSavedSyncMode()
+export const CLOUD_STATE_UPDATED_EVENT = 'class-helper-cloud-state-updated'
+const LOCAL_STORAGE_MUTATION_EVENT = 'class-helper-local-storage-mutated'
+const SYNC_META_KEY = 'classHelperCloudSyncMetaV1'
+const DEVICE_ID_KEY = 'classHelperDeviceIdV1'
+const FORCE_UPLOAD_PENDING_KEY = 'classHelperCloudForceUploadPendingV1'
+const CLOUD_SCHEMA_VERSION = 1
+const CLOUD_PATH_SEGMENT = 'classHelper/currentClass'
+const SYNC_DEBOUNCE_MS = 700
 
 const state = reactive({
   user: null,
-  status: initialSyncMode === 'unselected'
-    ? 'choice-needed'
-    : initialSyncMode === 'local'
-      ? 'local-only'
-      : 'starting',
-  message: initialSyncMode === 'unselected'
-    ? '請先選擇資料要只留在本機，或啟用雲端同步'
-    : initialSyncMode === 'local'
-      ? '資料只儲存在這台裝置'
-      : '正在準備雲端同步…',
-  lastSyncAt: localStorage.getItem(LAST_SYNC_KEY) || '',
+  status: 'local-only',
+  message: '資料只儲存在這台裝置',
+  lastSyncAt: '',
   isOnline: navigator.onLine,
   uid: '',
   permissionDenied: false,
   hasCloudData: false,
-  localOnly: initialSyncMode !== 'cloud',
-  syncMode: initialSyncMode,
-  needsModeChoice: initialSyncMode === 'unselected',
+  localOnly: true,
+  syncMode: getStorageMode(),
+  needsModeChoice: false,
   conflictPending: false,
   conflictLocalCount: 0,
-  conflictCloudCount: 0
+  conflictCloudCount: 0,
+  conflictCloudUpdatedAt: '',
+  pendingChanges: false,
+  projectId: '',
+  email: ''
 })
-
 export const cloudState = readonly(state)
 
-let storageObserverInstalled = false
-let cloudSyncStarted = false
-let applyingRemote = false
-let stopEntriesListener = null
-let activeUserRoot = null
-let activeEntriesRef = null
-let lastCloudEntries = new Map()
-let pendingConflictEntries = null
-const pendingWriteTimers = new Map()
+let observerInstalled = false
+let storagePrototypePatched = false
+let applyingCloudData = false
+let syncTimer = null
+let observerPollId = null
+let lastObservedHash = ''
+let cloudUnsubscribe = null
+let activeServices = null
+let activeCloudRef = null
+let pendingRemotePayload = null
+let connectionToken = 0
 
-function setSavedSyncMode(mode) {
-  state.syncMode = mode
-  state.needsModeChoice = false
-  nativeStorageSetItem.call(localStorage, SYNC_MODE_KEY, mode)
+function emitState() {
+  window.dispatchEvent(new CustomEvent(CLOUD_STATE_UPDATED_EVENT))
+}
+
+function setState(patch) {
+  Object.assign(state, patch)
+  emitState()
+}
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+function safeJson(raw, fallback = null) {
+  try {
+    const value = JSON.parse(raw || '')
+    return value ?? fallback
+  } catch {
+    return fallback
+  }
 }
 
 function getDeviceId() {
-  let deviceId = localStorage.getItem(DEVICE_ID_KEY)
-  if (!deviceId) {
-    deviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    nativeStorageSetItem.call(localStorage, DEVICE_ID_KEY, deviceId)
-  }
-  return deviceId
+  const saved = localStorage.getItem(DEVICE_ID_KEY)
+  if (saved) return saved
+  const id = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  localStorage.setItem(DEVICE_ID_KEY, id)
+  return id
 }
 
-const deviceId = getDeviceId()
-
-function shouldSyncKey(key) {
-  const text = String(key || '')
-  return Boolean(text) && !text.startsWith(CLOUD_RESERVED_PREFIX) && !text.startsWith('firebase:')
-}
-
-function readDirtyKeys() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DIRTY_KEYS_KEY) || '{}')
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeDirtyKeys(value) {
-  nativeStorageSetItem.call(localStorage, DIRTY_KEYS_KEY, JSON.stringify(value))
-}
-
-function markDirtyKey(key) {
-  if (!shouldSyncKey(key)) return
-  const dirty = readDirtyKeys()
-  dirty[key] = Date.now()
-  writeDirtyKeys(dirty)
-}
-
-function clearDirtyKey(key) {
-  const dirty = readDirtyKeys()
-  if (!(key in dirty)) return
-  delete dirty[key]
-  writeDirtyKeys(dirty)
-}
-
-function clearAllDirtyKeys() {
-  writeDirtyKeys({})
-}
-
-function encodeStorageKey(key) {
-  const bytes = new TextEncoder().encode(String(key))
-  let binary = ''
-  bytes.forEach(byte => { binary += String.fromCharCode(byte) })
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-}
-
-function readLocalSnapshot() {
-  const result = {}
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index)
-    if (!shouldSyncKey(key)) continue
-    result[key] = localStorage.getItem(key)
-  }
-  return result
-}
-
-function writeLastSync(value = new Date().toISOString()) {
-  state.lastSyncAt = value
-  nativeStorageSetItem.call(localStorage, LAST_SYNC_KEY, value)
-}
-
-function dispatchCloudUpdate(keys, reason = 'remote') {
-  if (!keys.length) return
-  window.dispatchEvent(new CustomEvent(CLOUD_DATA_UPDATED_EVENT, {
-    detail: { keys: [...new Set(keys)], reason }
-  }))
-}
-
-function normalizeCloudEntries(value) {
-  const map = new Map()
-  if (!value || typeof value !== 'object') return map
-
-  for (const entry of Object.values(value)) {
-    if (!entry || typeof entry !== 'object' || !shouldSyncKey(entry.key)) continue
-    map.set(String(entry.key), {
-      key: String(entry.key),
-      value: entry.value === null || entry.value === undefined ? null : String(entry.value),
-      updatedAt: Number(entry.updatedAt) || 0,
-      deviceId: String(entry.deviceId || '')
-    })
-  }
-  return map
-}
-
-function snapshotsEquivalent(localSnapshot, cloudEntries) {
-  const localKeys = Object.keys(localSnapshot)
-  if (localKeys.length !== cloudEntries.size) return false
-
-  return localKeys.every(key => {
-    const cloudEntry = cloudEntries.get(key)
-    return cloudEntry && cloudEntry.value === localSnapshot[key]
-  })
-}
-
-function applyCloudEntries(nextEntries, { removeMissing = false, skipKeys = new Set() } = {}) {
-  const changedKeys = []
-  applyingRemote = true
-
-  try {
-    for (const [key, entry] of nextEntries.entries()) {
-      if (skipKeys.has(key)) continue
-      const currentValue = localStorage.getItem(key)
-      if (entry.value === null) {
-        if (currentValue !== null) {
-          nativeStorageRemoveItem.call(localStorage, key)
-          changedKeys.push(key)
-        }
-      } else if (currentValue !== entry.value) {
-        nativeStorageSetItem.call(localStorage, key, entry.value)
-        changedKeys.push(key)
-      }
-    }
-
-    if (removeMissing) {
-      const localKeys = Object.keys(readLocalSnapshot())
-      for (const key of localKeys) {
-        if (skipKeys.has(key)) continue
-        if (!nextEntries.has(key) && localStorage.getItem(key) !== null) {
-          nativeStorageRemoveItem.call(localStorage, key)
-          changedKeys.push(key)
-        }
-      }
-    }
-  } finally {
-    applyingRemote = false
-  }
-
-  lastCloudEntries = nextEntries
-  dispatchCloudUpdate(changedKeys)
-  return changedKeys
-}
-
-function clearConflictState() {
-  pendingConflictEntries = null
-  state.conflictPending = false
-  state.conflictLocalCount = 0
-  state.conflictCloudCount = 0
-}
-
-function clearPendingWriteTimers() {
-  for (const timer of pendingWriteTimers.values()) clearTimeout(timer)
-  pendingWriteTimers.clear()
-}
-
-function detachCloudConnection({ clearReferences = true } = {}) {
-  stopEntriesListener?.()
-  stopEntriesListener = null
-  clearPendingWriteTimers()
-  lastCloudEntries = new Map()
-  clearConflictState()
-
-  if (clearReferences) {
-    activeUserRoot = null
-    activeEntriesRef = null
-  }
-}
-
-function setLocalModeState(message = '資料只儲存在這台裝置') {
-  state.status = 'local-only'
-  state.message = message
-  state.permissionDenied = false
-  state.localOnly = true
-  state.hasCloudData = false
-}
-
-async function uploadLocalSnapshot({ replaceCloud = false } = {}) {
-  if (!activeUserRoot || !activeEntriesRef) return
-
-  const localSnapshot = readLocalSnapshot()
-  const now = Date.now()
-  const entries = {}
-
-  for (const [key, value] of Object.entries(localSnapshot)) {
-    entries[encodeStorageKey(key)] = {
-      key,
-      value,
-      updatedAt: now,
-      deviceId
-    }
-  }
-
-  state.status = 'syncing'
-  state.message = replaceCloud
-    ? '正在以這台裝置的資料更新雲端…'
-    : '正在上傳這台裝置的既有資料…'
-
-  if (replaceCloud) {
-    await set(activeEntriesRef, Object.keys(entries).length ? entries : null)
-    await update(activeUserRoot, {
-      'meta/updatedAt': now,
-      'meta/updatedByDevice': deviceId,
-      'meta/schemaVersion': 2
-    })
-  } else {
-    const updates = {
-      'meta/updatedAt': now,
-      'meta/updatedByDevice': deviceId,
-      'meta/schemaVersion': 2
-    }
-    for (const [encodedKey, entry] of Object.entries(entries)) {
-      updates[`entries/${encodedKey}`] = entry
-    }
-    await update(activeUserRoot, updates)
-  }
-
-  clearAllDirtyKeys()
-  writeLastSync()
-  state.hasCloudData = Object.keys(localSnapshot).length > 0
-  state.status = 'synced'
-  state.message = '雲端同步完成'
-  state.localOnly = false
-}
-
-async function uploadLocalOnlyKeys(cloudEntries) {
-  if (!activeUserRoot) return
-  const localSnapshot = readLocalSnapshot()
-  const updates = {}
-  const now = Date.now()
-
-  for (const [key, value] of Object.entries(localSnapshot)) {
-    if (cloudEntries.has(key)) continue
-    updates[`entries/${encodeStorageKey(key)}`] = {
-      key,
-      value,
-      updatedAt: now,
-      deviceId
-    }
-  }
-
-  if (Object.keys(updates).length === 0) return
-  updates['meta/updatedAt'] = now
-  updates['meta/updatedByDevice'] = deviceId
-  updates['meta/schemaVersion'] = 2
-  await update(activeUserRoot, updates)
-}
-
-async function uploadDirtyKeys() {
-  if (!activeUserRoot) return
-  const dirty = readDirtyKeys()
-  const keys = Object.keys(dirty).filter(shouldSyncKey)
-  if (keys.length === 0) return
-
-  const updates = {}
-  const now = Date.now()
-  for (const key of keys) {
-    const value = localStorage.getItem(key)
-    const path = `entries/${encodeStorageKey(key)}`
-    updates[path] = value === null
-      ? null
-      : { key, value, updatedAt: Number(dirty[key]) || now, deviceId }
-  }
-  updates['meta/updatedAt'] = now
-  updates['meta/updatedByDevice'] = deviceId
-  updates['meta/schemaVersion'] = 2
-
-  await update(activeUserRoot, updates)
-  clearAllDirtyKeys()
-}
-
-function handleCloudPermissionError(error) {
-  console.warn('Firebase 雲端資料讀寫尚未授權：', error)
-  state.permissionDenied = error?.code === 'PERMISSION_DENIED' || error?.code === 'permission-denied'
-  state.status = state.permissionDenied ? 'permission-denied' : 'error'
-  state.message = state.permissionDenied
-    ? '已登入，但 Firebase 資料庫規則尚未更新'
-    : '雲端連線失敗，資料仍保存在本機'
-  state.localOnly = true
-}
-
-function beginRealtimeListener() {
-  if (!activeEntriesRef || state.syncMode !== 'cloud') return
-  stopEntriesListener?.()
-
-  stopEntriesListener = onValue(
-    activeEntriesRef,
-    snapshot => {
-      if (state.syncMode !== 'cloud' || state.conflictPending) return
-      const nextEntries = normalizeCloudEntries(snapshot.val())
-      applyCloudEntries(nextEntries, { removeMissing: true })
-      state.hasCloudData = nextEntries.size > 0
-      state.permissionDenied = false
-      state.status = navigator.onLine ? 'synced' : 'offline'
-      state.message = navigator.onLine ? '雲端同步完成' : '目前離線，變更會先留在本機'
-      state.localOnly = false
-      writeLastSync()
-    },
-    handleCloudPermissionError
+function canonicalData(data) {
+  return Object.fromEntries(
+    Object.entries(data || {})
+      .filter(([, value]) => typeof value === 'string')
+      .sort(([a], [b]) => a.localeCompare(b))
   )
 }
 
-async function connectSignedInUser(user) {
-  if (state.syncMode !== 'cloud') return
+function hashText(text) {
+  let hash = 2166136261
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
 
-  stopEntriesListener?.()
-  stopEntriesListener = null
-  lastCloudEntries = new Map()
-  clearConflictState()
-  state.permissionDenied = false
-  state.uid = user.uid
-  state.status = 'connecting'
-  state.message = '正在檢查這台裝置與雲端資料…'
+export function hashClassData(data = readClassData()) {
+  return hashText(JSON.stringify(canonicalData(data)))
+}
 
-  activeUserRoot = databaseRef(firebaseDatabase, `users/${user.uid}/current`)
-  activeEntriesRef = databaseRef(firebaseDatabase, `users/${user.uid}/current/entries`)
+function payloadHash(payload) {
+  if (!payload || typeof payload !== 'object') return ''
+  return String(payload.dataHash || hashClassData(payload.classData || {}))
+}
 
-  try {
-    const snapshot = await get(activeUserRoot)
-    if (state.syncMode !== 'cloud') return
-
-    const cloudRoot = snapshot.val()
-    const cloudEntries = normalizeCloudEntries(cloudRoot?.entries)
-    const localSnapshot = readLocalSnapshot()
-    const localCount = Object.keys(localSnapshot).length
-    const dirtyKeys = new Set(Object.keys(readDirtyKeys()).filter(shouldSyncKey))
-
-    state.hasCloudData = cloudEntries.size > 0
-
-    if (cloudEntries.size === 0) {
-      await uploadLocalSnapshot()
-      beginRealtimeListener()
-      return
-    }
-
-    if (localCount === 0) {
-      applyCloudEntries(cloudEntries, { removeMissing: true })
-      clearAllDirtyKeys()
-      writeLastSync()
-      state.status = 'synced'
-      state.message = '已載入你的雲端資料'
-      state.localOnly = false
-      beginRealtimeListener()
-      return
-    }
-
-    if (dirtyKeys.size > 0) {
-      applyCloudEntries(cloudEntries, { removeMissing: true, skipKeys: dirtyKeys })
-      await uploadDirtyKeys()
-      await uploadLocalOnlyKeys(cloudEntries)
-      writeLastSync()
-      state.status = 'synced'
-      state.message = '離線期間的變更已同步'
-      state.localOnly = false
-      beginRealtimeListener()
-      return
-    }
-
-    if (snapshotsEquivalent(localSnapshot, cloudEntries)) {
-      lastCloudEntries = cloudEntries
-      writeLastSync()
-      state.status = 'synced'
-      state.message = '雲端同步完成'
-      state.localOnly = false
-      beginRealtimeListener()
-      return
-    }
-
-    pendingConflictEntries = cloudEntries
-    state.conflictPending = true
-    state.conflictLocalCount = localCount
-    state.conflictCloudCount = cloudEntries.size
-    state.status = 'conflict'
-    state.message = '這台裝置與雲端都有不同資料，請選擇要保留哪一份'
-    state.localOnly = true
-  } catch (error) {
-    handleCloudPermissionError(error)
+function normalizeRemotePayload(value) {
+  if (!value || typeof value !== 'object') return null
+  const classData = canonicalData(value.classData || {})
+  return {
+    schemaVersion: Number(value.schemaVersion) || CLOUD_SCHEMA_VERSION,
+    revision: Math.max(0, Number(value.revision) || 0),
+    updatedAt: String(value.updatedAt || ''),
+    updatedBy: String(value.updatedBy || ''),
+    dataHash: String(value.dataHash || hashClassData(classData)),
+    classData
   }
 }
 
-async function writeStorageKeyToCloud(key, value) {
-  if (state.syncMode !== 'cloud' || state.conflictPending) return
-  if (!activeEntriesRef || !state.user || state.permissionDenied || !navigator.onLine) return
-  if (!shouldSyncKey(key)) return
+function buildPayload(classData, revision) {
+  const cleanData = canonicalData(classData)
+  return {
+    schemaVersion: CLOUD_SCHEMA_VERSION,
+    revision: Math.max(1, Number(revision) || 1),
+    updatedAt: nowIso(),
+    updatedBy: getDeviceId(),
+    dataHash: hashClassData(cleanData),
+    classData: cleanData
+  }
+}
 
-  const previous = lastCloudEntries.get(key)
-  const normalizedValue = value === null || value === undefined ? null : String(value)
-  if (previous?.value === normalizedValue) {
-    clearDirtyKey(key)
+function getSyncMeta() {
+  const saved = safeJson(localStorage.getItem(SYNC_META_KEY), {})
+  if (!saved || typeof saved !== 'object') return {}
+  return saved
+}
+
+function saveSyncMeta(remotePayload, localHash = payloadHash(remotePayload)) {
+  const revision = Number(remotePayload?.revision) || 0
+  const cloudHash = revision > 0 ? payloadHash(remotePayload) : String(remotePayload?.dataHash || '')
+  const meta = {
+    uid: state.uid,
+    projectId: state.projectId,
+    cloudRevision: revision,
+    cloudHash,
+    syncedHash: localHash,
+    lastSyncAt: nowIso()
+  }
+  localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta))
+  setState({ lastSyncAt: meta.lastSyncAt })
+  return meta
+}
+
+function getIdentityMeta() {
+  const meta = getSyncMeta()
+  if (meta.uid !== state.uid || meta.projectId !== state.projectId) return {}
+  return meta
+}
+
+function clearSyncTimer() {
+  if (syncTimer) window.clearTimeout(syncTimer)
+  syncTimer = null
+}
+
+function stopRealtimeListener() {
+  if (typeof cloudUnsubscribe === 'function') cloudUnsubscribe()
+  cloudUnsubscribe = null
+}
+
+function resetConnection() {
+  connectionToken += 1
+  clearSyncTimer()
+  stopRealtimeListener()
+  activeServices = null
+  activeCloudRef = null
+  pendingRemotePayload = null
+}
+
+function setLocalOnlyState(message = '資料只儲存在這台裝置') {
+  setState({
+    user: null,
+    status: 'local-only',
+    message,
+    uid: '',
+    permissionDenied: false,
+    hasCloudData: false,
+    localOnly: true,
+    syncMode: 'local',
+    conflictPending: false,
+    conflictLocalCount: 0,
+    conflictCloudCount: 0,
+    conflictCloudUpdatedAt: '',
+    pendingChanges: false,
+    projectId: '',
+    email: ''
+  })
+}
+
+function patchLocalStorage() {
+  if (storagePrototypePatched) return
+  storagePrototypePatched = true
+  const prototype = Object.getPrototypeOf(window.localStorage)
+  const originalSetItem = prototype.setItem
+  const originalRemoveItem = prototype.removeItem
+  const originalClear = prototype.clear
+
+  prototype.setItem = function patchedSetItem(key, value) {
+    const oldValue = this === window.localStorage ? this.getItem(key) : null
+    originalSetItem.call(this, key, value)
+    if (this === window.localStorage && oldValue !== String(value)) {
+      window.dispatchEvent(new CustomEvent(LOCAL_STORAGE_MUTATION_EVENT, {
+        detail: { key: String(key), oldValue, newValue: String(value) }
+      }))
+    }
+  }
+
+  prototype.removeItem = function patchedRemoveItem(key) {
+    const oldValue = this === window.localStorage ? this.getItem(key) : null
+    originalRemoveItem.call(this, key)
+    if (this === window.localStorage && oldValue !== null) {
+      window.dispatchEvent(new CustomEvent(LOCAL_STORAGE_MUTATION_EVENT, {
+        detail: { key: String(key), oldValue, newValue: null }
+      }))
+    }
+  }
+
+  prototype.clear = function patchedClear() {
+    const keys = this === window.localStorage
+      ? Array.from({ length: this.length }, (_, index) => this.key(index)).filter(Boolean)
+      : []
+    originalClear.call(this)
+    if (this === window.localStorage) {
+      for (const key of keys) {
+        window.dispatchEvent(new CustomEvent(LOCAL_STORAGE_MUTATION_EVENT, {
+          detail: { key, oldValue: null, newValue: null }
+        }))
+      }
+    }
+  }
+}
+
+function scheduleLocalUpload() {
+  if (applyingCloudData || getStorageMode() !== 'firebase') return
+  setState({ pendingChanges: true })
+  if (!navigator.onLine) {
+    setState({ status: 'offline', message: '目前離線；變更已安全保存在這台裝置', localOnly: false })
     return
   }
-
-  state.status = 'syncing'
-  state.message = '正在同步剛剛的變更…'
-
-  try {
-    const entryRef = databaseRef(
-      firebaseDatabase,
-      `users/${state.user.uid}/current/entries/${encodeStorageKey(key)}`
-    )
-
-    if (normalizedValue === null) {
-      await set(entryRef, null)
-    } else {
-      await set(entryRef, {
-        key,
-        value: normalizedValue,
-        updatedAt: Date.now(),
-        deviceId
-      })
-    }
-
-    await update(activeUserRoot, {
-      'meta/updatedAt': Date.now(),
-      'meta/updatedByDevice': deviceId,
-      'meta/schemaVersion': 2
-    })
-
-    clearDirtyKey(key)
-    writeLastSync()
-    state.status = 'synced'
-    state.message = '雲端同步完成'
-    state.localOnly = false
-  } catch (error) {
-    handleCloudPermissionError(error)
-  }
+  if (!activeCloudRef || !state.uid || state.conflictPending) return
+  clearSyncTimer()
+  syncTimer = window.setTimeout(() => {
+    syncTimer = null
+    void syncNow()
+  }, SYNC_DEBOUNCE_MS)
 }
 
-function scheduleStorageWrite(key, value) {
-  if (!shouldSyncKey(key)) return
-  clearTimeout(pendingWriteTimers.get(key))
-  const timer = window.setTimeout(() => {
-    pendingWriteTimers.delete(key)
-    writeStorageKeyToCloud(key, value)
-  }, 320)
-  pendingWriteTimers.set(key, timer)
+function handleLocalStorageMutation(event) {
+  const key = event?.detail?.key
+  if (!key || !isClassDataKey(key)) return
+  lastObservedHash = hashClassData()
+  scheduleLocalUpload()
 }
 
-function handleLocalStorageChanged(event) {
-  if (applyingRemote || state.syncMode !== 'cloud') return
-  const { key, value } = event.detail || {}
-  markDirtyKey(key)
-  scheduleStorageWrite(key, value)
+function handleStorageEvent(event) {
+  if (!event.key || !isClassDataKey(event.key)) return
+  scheduleLocalUpload()
 }
 
 function handleOnline() {
-  state.isOnline = true
-  if (state.syncMode === 'cloud' && state.user && !state.permissionDenied) {
-    state.status = 'connecting'
-    state.message = '網路已恢復，正在重新同步…'
-    connectSignedInUser(state.user)
-  } else if (state.syncMode === 'local') {
-    setLocalModeState()
-  }
+  setState({ isOnline: true })
+  if (getStorageMode() === 'firebase') void retryCloudSync()
 }
 
 function handleOffline() {
-  state.isOnline = false
-  if (state.syncMode === 'cloud') {
-    state.status = 'offline'
-    state.message = '目前離線，變更會先留在這台裝置'
-  } else if (state.syncMode === 'local') {
-    setLocalModeState()
-  }
+  setState({
+    isOnline: false,
+    status: getStorageMode() === 'firebase' ? 'offline' : 'local-only',
+    message: getStorageMode() === 'firebase'
+      ? '目前離線；資料仍會先保存在這台裝置'
+      : '資料只儲存在這台裝置'
+  })
 }
 
 export function installLocalStorageObserver() {
-  if (storageObserverInstalled) return
-  storageObserverInstalled = true
-
-  Storage.prototype.setItem = function patchedSetItem(key, value) {
-    nativeStorageSetItem.call(this, key, value)
-    if (this === localStorage && !applyingRemote) {
-      window.dispatchEvent(new CustomEvent(LOCAL_STORAGE_CHANGED_EVENT, {
-        detail: { key: String(key), value: String(value) }
-      }))
-    }
+  if (observerInstalled) return
+  observerInstalled = true
+  try {
+    patchLocalStorage()
+  } catch (error) {
+    console.warn('無法攔截 localStorage，已改用輪詢偵測同步變更。', error)
   }
-
-  Storage.prototype.removeItem = function patchedRemoveItem(key) {
-    nativeStorageRemoveItem.call(this, key)
-    if (this === localStorage && !applyingRemote) {
-      window.dispatchEvent(new CustomEvent(LOCAL_STORAGE_CHANGED_EVENT, {
-        detail: { key: String(key), value: null }
-      }))
-    }
-  }
-
-  Storage.prototype.clear = function patchedClear() {
-    const keys = []
-    if (this === localStorage) {
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const key = localStorage.key(index)
-        if (shouldSyncKey(key)) keys.push(key)
-      }
-    }
-
-    nativeStorageClear.call(this)
-
-    if (this === localStorage && !applyingRemote) {
-      keys.forEach(key => {
-        window.dispatchEvent(new CustomEvent(LOCAL_STORAGE_CHANGED_EVENT, {
-          detail: { key, value: null }
-        }))
-      })
-    }
-  }
-
-  window.addEventListener(LOCAL_STORAGE_CHANGED_EVENT, handleLocalStorageChanged)
+  lastObservedHash = hashClassData()
+  window.addEventListener(LOCAL_STORAGE_MUTATION_EVENT, handleLocalStorageMutation)
+  window.addEventListener('storage', handleStorageEvent)
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
+
+  // Safari 等瀏覽器若限制覆寫 Storage 方法，仍以低頻雜湊輪詢補捉同分頁變更。
+  observerPollId = window.setInterval(() => {
+    const nextHash = hashClassData()
+    if (nextHash === lastObservedHash) return
+    lastObservedHash = nextHash
+    scheduleLocalUpload()
+  }, 1400)
 }
 
-export async function startCloudSync() {
-  if (cloudSyncStarted) return
-  cloudSyncStarted = true
+function setConflict(remotePayload) {
+  const localData = readClassData()
+  const localSummary = getClassDataSummaryFromObject(localData)
+  const cloudSummary = getClassDataSummaryFromObject(remotePayload?.classData || {})
+  pendingRemotePayload = remotePayload
+  clearSyncTimer()
+  setState({
+    status: 'conflict',
+    message: '發現這台裝置與雲端都有不同資料，請選擇要保留哪一份',
+    conflictPending: true,
+    conflictLocalCount: localSummary.dataKeyCount,
+    conflictCloudCount: cloudSummary.dataKeyCount,
+    conflictCloudUpdatedAt: remotePayload?.updatedAt || '',
+    pendingChanges: true,
+    localOnly: false
+  })
+}
 
+function clearConflict() {
+  pendingRemotePayload = null
+  setState({
+    conflictPending: false,
+    conflictLocalCount: 0,
+    conflictCloudCount: 0,
+    conflictCloudUpdatedAt: ''
+  })
+}
+
+function applyRemotePayload(remotePayload) {
+  const normalized = normalizeRemotePayload(remotePayload)
+  if (!normalized) return false
+  applyingCloudData = true
   try {
-    await prepareFirebaseAuth()
-    await getRedirectResult(firebaseAuth).catch(error => {
-      if (error?.code !== 'auth/no-auth-event') console.warn('Google 重新導向登入結果：', error)
-    })
-
-    onAuthStateChanged(firebaseAuth, user => {
-      state.user = user
-      state.uid = user?.uid || ''
-
-      if (state.syncMode === 'unselected') {
-        detachCloudConnection()
-        state.status = 'choice-needed'
-        state.message = '請先選擇資料要只留在本機，或啟用雲端同步'
-        state.localOnly = true
-        return
-      }
-
-      if (state.syncMode === 'local') {
-        detachCloudConnection()
-        setLocalModeState()
-        return
-      }
-
-      if (!user) {
-        detachCloudConnection()
-        state.status = 'signed-out'
-        state.message = '雲端同步已開啟，請使用 Google 登入'
-        state.permissionDenied = false
-        state.localOnly = true
-        return
-      }
-
-      connectSignedInUser(user)
-    })
-  } catch (error) {
-    console.error('Firebase 初始化失敗：', error)
-    state.status = 'error'
-    state.message = 'Firebase 初始化失敗，仍可使用本機資料'
-    state.localOnly = true
+    replaceClassData(normalized.classData)
+    lastObservedHash = normalized.dataHash
+  } finally {
+    applyingCloudData = false
   }
+  saveSyncMeta(normalized, normalized.dataHash)
+  clearConflict()
+  setState({
+    status: 'synced',
+    message: '已從雲端更新到最新資料',
+    hasCloudData: true,
+    localOnly: false,
+    pendingChanges: false
+  })
+  window.dispatchEvent(new CustomEvent(CLOUD_DATA_UPDATED_EVENT, {
+    detail: { source: 'cloud', revision: normalized.revision, updatedAt: normalized.updatedAt }
+  }))
+  return true
 }
 
-export async function chooseLocalStorageMode() {
-  setSavedSyncMode('local')
-  detachCloudConnection()
-  clearAllDirtyKeys()
-  setLocalModeState('已切換為本機儲存；雲端舊備份不會被刪除')
+async function fetchRemotePayload() {
+  if (!activeCloudRef) return null
+  const snapshot = await get(activeCloudRef)
+  return snapshot.exists() ? normalizeRemotePayload(snapshot.val()) : null
+}
 
-  if (firebaseAuth.currentUser) {
-    try {
-      await signOut(firebaseAuth)
-    } catch (error) {
-      console.warn('Google 登出失敗，但本機模式已生效：', error)
+async function uploadLocalSnapshot({ force = false } = {}) {
+  if (!activeCloudRef || !state.uid) throw new Error('尚未連接個人 Firebase')
+  if (!navigator.onLine) throw new Error('目前離線，資料已保存在這台裝置')
+
+  const localData = readClassData()
+  const localHash = hashClassData(localData)
+  const meta = getIdentityMeta()
+  const expectedCloudHash = String(meta.cloudHash || '')
+
+  setState({ status: 'syncing', message: '正在把這台裝置的變更同步到雲端…', pendingChanges: true, localOnly: false })
+
+  const result = await runTransaction(activeCloudRef, currentValue => {
+    const current = normalizeRemotePayload(currentValue)
+    const currentHash = payloadHash(current)
+
+    if (!force) {
+      const remoteMatchesKnown = (!current && !expectedCloudHash) || currentHash === expectedCloudHash
+      const remoteAlreadyMatchesLocal = currentHash && currentHash === localHash
+      if (!remoteMatchesKnown && !remoteAlreadyMatchesLocal) return undefined
+      if (remoteAlreadyMatchesLocal) return currentValue
     }
+
+    const nextRevision = (Number(current?.revision) || 0) + 1
+    return buildPayload(localData, nextRevision)
+  }, { applyLocally: false })
+
+  if (!result.committed) {
+    const latest = await fetchRemotePayload()
+    if (latest) setConflict(latest)
+    throw new Error('雲端資料在同步前已被其他裝置更新')
   }
+
+  const remotePayload = normalizeRemotePayload(result.snapshot.val()) || buildPayload(localData, 1)
+  saveSyncMeta(remotePayload, localHash)
+  lastObservedHash = localHash
+  localStorage.removeItem(FORCE_UPLOAD_PENDING_KEY)
+  clearConflict()
+  setState({
+    status: 'synced',
+    message: '已同步',
+    hasCloudData: true,
+    localOnly: false,
+    pendingChanges: false,
+    permissionDenied: false
+  })
+  return remotePayload
 }
 
-export async function enableCloudSync() {
-  setSavedSyncMode('cloud')
-  state.localOnly = true
-  state.status = 'connecting'
-  state.message = '正在準備啟用雲端同步…'
+async function alignInitialData(remotePayload) {
+  const localData = readClassData()
+  const localHash = hashClassData(localData)
+  const localMeaningful = hasMeaningfulClassData(localData)
+  const meta = getIdentityMeta()
 
-  const user = firebaseAuth.currentUser
-  if (user) {
-    state.user = user
-    state.uid = user.uid
-    await connectSignedInUser(user)
+  if (!remotePayload) {
+    if (localMeaningful) await uploadLocalSnapshot({ force: true })
+    else {
+      saveSyncMeta({ revision: 0, dataHash: '', classData: {} }, localHash)
+      setState({ status: 'synced', message: '已連線；目前尚無班級資料', hasCloudData: false, localOnly: false, pendingChanges: false })
+    }
     return
   }
 
-  await signInCloud()
+  const remoteHash = payloadHash(remotePayload)
+  const remoteMeaningful = hasMeaningfulClassData(remotePayload.classData)
+
+  if (localHash === remoteHash) {
+    saveSyncMeta(remotePayload, localHash)
+    setState({ status: 'synced', message: '已同步', hasCloudData: true, localOnly: false, pendingChanges: false })
+    return
+  }
+
+  if (!localMeaningful && remoteMeaningful) {
+    applyRemotePayload(remotePayload)
+    return
+  }
+
+  if (!localMeaningful && !remoteMeaningful) {
+    applyRemotePayload(remotePayload)
+    return
+  }
+
+  if (localMeaningful && !remoteMeaningful) {
+    saveSyncMeta(remotePayload, remoteHash)
+    await uploadLocalSnapshot({ force: true })
+    return
+  }
+
+  if (meta.syncedHash && localHash === meta.syncedHash) {
+    applyRemotePayload(remotePayload)
+    return
+  }
+
+  if (meta.cloudHash && remoteHash === meta.cloudHash) {
+    await uploadLocalSnapshot()
+    return
+  }
+
+  setConflict(remotePayload)
 }
 
-export async function signInCloud() {
-  if (state.syncMode !== 'cloud') setSavedSyncMode('cloud')
-  state.status = 'connecting'
-  state.message = '正在開啟 Google 登入…'
+function handleRemoteSnapshot(snapshot) {
+  const remotePayload = snapshot.exists() ? normalizeRemotePayload(snapshot.val()) : null
+  if (!remotePayload) return
+
+  const localData = readClassData()
+  const localHash = hashClassData(localData)
+  const remoteHash = payloadHash(remotePayload)
+  const meta = getIdentityMeta()
+
+  if (remoteHash === localHash) {
+    saveSyncMeta(remotePayload, localHash)
+    setState({ status: 'synced', message: '已同步', hasCloudData: true, localOnly: false, pendingChanges: false })
+    return
+  }
+
+  if (localHash === meta.syncedHash) {
+    applyRemotePayload(remotePayload)
+    return
+  }
+
+  if (remoteHash === meta.cloudHash) {
+    scheduleLocalUpload()
+    return
+  }
+
+  setConflict(remotePayload)
+}
+
+function startRealtimeListener(token) {
+  stopRealtimeListener()
+  if (!activeCloudRef) return
+  cloudUnsubscribe = onValue(activeCloudRef, snapshot => {
+    if (token !== connectionToken || getStorageMode() !== 'firebase') return
+    handleRemoteSnapshot(snapshot)
+  }, error => {
+    if (token !== connectionToken) return
+    const denied = error?.code === 'PERMISSION_DENIED' || error?.code === 'permission-denied'
+    setState({
+      status: 'error',
+      message: denied ? 'Firebase 拒絕存取，請檢查安全規則' : (error?.message || '雲端監聽失敗'),
+      permissionDenied: denied,
+      localOnly: false
+    })
+  })
+}
+
+async function connectCloud({ interactive = false } = {}) {
+  const config = getPersonalFirebaseConfig()
+  if (!config) {
+    setState({ status: 'setup-required', message: '請先完成個人 Firebase 設定精靈', localOnly: true, syncMode: 'firebase' })
+    return false
+  }
+
+  if (!navigator.onLine) {
+    setState({ status: 'offline', message: '目前離線；資料仍會先保存在這台裝置', localOnly: false, syncMode: 'firebase', isOnline: false })
+    return false
+  }
+
+  resetConnection()
+  const token = connectionToken
+  setState({
+    status: 'connecting',
+    message: '正在連接老師自己的 Firebase…',
+    syncMode: 'firebase',
+    localOnly: false,
+    permissionDenied: false,
+    isOnline: true
+  })
 
   try {
-    await signInWithPopup(firebaseAuth, googleProvider)
-  } catch (error) {
-    const redirectCodes = new Set([
-      'auth/popup-blocked',
-      'auth/cancelled-popup-request',
-      'auth/operation-not-supported-in-this-environment'
-    ])
-
-    if (redirectCodes.has(error?.code)) {
-      await signInWithRedirect(firebaseAuth, googleProvider)
-      return
+    let services = await initializeTeacherFirebase(config)
+    let user = await waitForTeacherAuth(services.auth)
+    if (!user && interactive) {
+      services = await signInTeacherFirebase(config, { forceChooser: true })
+      user = services.user
     }
 
-    state.status = 'signed-out'
-    state.message = error?.code === 'auth/popup-closed-by-user'
-      ? '已取消登入；資料仍保存在這台裝置'
-      : 'Google 登入失敗，請稍後再試'
-    state.localOnly = true
-    throw error
-  }
-}
-
-export async function signOutCloud() {
-  detachCloudConnection()
-  await signOut(firebaseAuth)
-  state.status = 'signed-out'
-  state.message = '已登出；雲端同步設定仍保留，可隨時重新登入'
-  state.localOnly = true
-}
-
-export async function retryCloudSync() {
-  if (state.syncMode !== 'cloud') return enableCloudSync()
-  if (!state.user) return signInCloud()
-  await connectSignedInUser(state.user)
-}
-
-export async function resolveSyncConflict(source) {
-  if (!state.conflictPending || !pendingConflictEntries) return false
-  if (!activeUserRoot || !activeEntriesRef || !state.user) return false
-
-  try {
-    if (source === 'local') {
-      await uploadLocalSnapshot({ replaceCloud: true })
-    } else if (source === 'cloud') {
-      state.status = 'syncing'
-      state.message = '正在以雲端資料更新這台裝置…'
-      applyCloudEntries(pendingConflictEntries, { removeMissing: true })
-      clearAllDirtyKeys()
-      writeLastSync()
-      state.status = 'synced'
-      state.message = '已使用雲端資料'
-      state.localOnly = false
-    } else {
+    if (!user?.uid) {
+      setState({ status: 'sign-in-required', message: '請登入 Google，才能讀取老師自己的雲端資料', localOnly: false })
       return false
     }
 
-    clearConflictState()
-    beginRealtimeListener()
+    if (token !== connectionToken) return false
+    activeServices = services
+    activeCloudRef = ref(services.database, `users/${user.uid}/${CLOUD_PATH_SEGMENT}`)
+    setState({
+      user,
+      uid: user.uid,
+      email: user.email || '',
+      projectId: services.config.projectId,
+      status: 'connecting',
+      message: '正在比對這台裝置與雲端資料…',
+      syncMode: 'firebase',
+      localOnly: false
+    })
+
+    if (localStorage.getItem(FORCE_UPLOAD_PENDING_KEY) === 'true') {
+      await uploadLocalSnapshot({ force: true })
+      if (token !== connectionToken) return false
+      startRealtimeListener(token)
+      return true
+    }
+
+    const remotePayload = await fetchRemotePayload()
+    if (token !== connectionToken) return false
+    await alignInitialData(remotePayload)
+    if (token !== connectionToken) return false
+    startRealtimeListener(token)
     return true
   } catch (error) {
-    handleCloudPermissionError(error)
+    if (token !== connectionToken) return false
+    console.error('Firebase 同步啟動失敗', error)
+    const denied = error?.code === 'PERMISSION_DENIED' || error?.code === 'permission-denied'
+    setState({
+      status: navigator.onLine ? 'error' : 'offline',
+      message: denied ? 'Firebase 拒絕存取，請檢查安全規則' : (error?.message || '無法啟動雲端同步'),
+      permissionDenied: denied,
+      localOnly: false
+    })
     return false
   }
+}
+
+export async function startCloudSync(options = {}) {
+  installLocalStorageObserver()
+  const wantsCloud = getStorageMode() === 'firebase'
+  if (!wantsCloud) {
+    resetConnection()
+    setLocalOnlyState()
+    return false
+  }
+  return connectCloud({ interactive: Boolean(options.interactive) })
+}
+
+export async function chooseLocalStorageMode() {
+  setStorageMode('local')
+  resetConnection()
+  setLocalOnlyState('已切換為本機模式；雲端資料不會被刪除')
+  return true
+}
+
+export async function enableCloudSync({ interactive = true } = {}) {
+  if (!getPersonalFirebaseConfig()) throw new Error('請先到資料與同步完成個人 Firebase 設定')
+  setStorageMode('firebase')
+  setState({ syncMode: 'firebase' })
+  return connectCloud({ interactive })
+}
+
+export async function signInCloud() {
+  return enableCloudSync({ interactive: true })
+}
+
+export async function signOutCloud() {
+  const config = getPersonalFirebaseConfig()
+  resetConnection()
+  if (config) await signOutTeacherFirebase(config)
+  setState({
+    user: null,
+    uid: '',
+    email: '',
+    status: getStorageMode() === 'firebase' ? 'sign-in-required' : 'local-only',
+    message: getStorageMode() === 'firebase' ? '已登出；本機資料仍保留' : '資料只儲存在這台裝置',
+    pendingChanges: false,
+    conflictPending: false
+  })
+  return true
+}
+
+export async function retryCloudSync() {
+  return startCloudSync({ interactive: false })
+}
+
+export async function syncNow({ force = false } = {}) {
+  if (getStorageMode() !== 'firebase') return false
+  if (force) localStorage.setItem(FORCE_UPLOAD_PENDING_KEY, 'true')
+  const neededConnection = !activeCloudRef || !state.uid
+  if (neededConnection) {
+    const connected = await connectCloud({ interactive: false })
+    if (!connected || !activeCloudRef) return false
+    if (force && localStorage.getItem(FORCE_UPLOAD_PENDING_KEY) !== 'true') return true
+  }
+  try {
+    await uploadLocalSnapshot({ force })
+    return true
+  } catch (error) {
+    if (!state.conflictPending) {
+      setState({
+        status: navigator.onLine ? 'error' : 'offline',
+        message: error?.message || '同步失敗，稍後可重試',
+        pendingChanges: true,
+        localOnly: false
+      })
+    }
+    return false
+  }
+}
+
+export async function resolveSyncConflict(strategy) {
+  if (!state.conflictPending) return false
+  if (strategy === 'cloud') {
+    if (!pendingRemotePayload) throw new Error('找不到可使用的雲端資料')
+    return applyRemotePayload(pendingRemotePayload)
+  }
+  if (strategy === 'local') {
+    await uploadLocalSnapshot({ force: true })
+    return true
+  }
+  return false
+}
+
+export function downloadFullBackup() {
+  return exportFullBackup()
 }
 
 export async function copyCloudUid() {
   if (!state.uid) return false
   await navigator.clipboard.writeText(state.uid)
   return true
-}
-
-export function downloadFullBackup() {
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    source: state.syncMode === 'cloud' ? '班級助手雲端同步版' : '班級助手本機版',
-    storageMode: state.syncMode,
-    cloudStatus: state.status,
-    data: readLocalSnapshot()
-  }
-
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  const date = new Date().toISOString().slice(0, 10)
-  link.href = url
-  link.download = `班級助手完整備份-${date}.json`
-  link.click()
-  URL.revokeObjectURL(url)
 }

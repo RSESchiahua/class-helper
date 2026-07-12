@@ -2563,3 +2563,1068 @@ body {
     overflow-y: auto;
   }
 }
+
+/* ✅ HUA_FIREBASE_WIZARD_STYLE_20260712：個人 Firebase 七步設定精靈與連線測試介面。 */
+.mode-card-actions,
+.wizard-summary-row,
+.firebase-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.wizard-summary-row {
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f6fbf8;
+  border: 1px solid #dceee6;
+}
+
+.wizard-summary-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.wizard-summary-row small {
+  color: #667085;
+  font-weight: 750;
+}
+
+.firebase-wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(36, 59, 83, .42);
+  backdrop-filter: blur(7px);
+}
+
+.firebase-wizard-modal {
+  position: relative;
+  width: min(980px, 96vw);
+  max-height: calc(100svh - 36px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  border: 1px solid #dbe8e1;
+  border-radius: 28px;
+  background: linear-gradient(145deg, #ffffff, #fffaf3 58%, #f2fbf6);
+  box-shadow: 0 28px 90px rgba(36, 59, 83, .28);
+}
+
+.wizard-close {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #f4f7f6;
+  color: #64748b;
+  font-size: 25px;
+}
+
+.wizard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 68px 16px 26px;
+}
+
+.wizard-header > div {
+  min-width: 0;
+}
+
+.wizard-header span,
+.wizard-header strong {
+  color: #2f6f57;
+  font-weight: 950;
+}
+
+.wizard-header h2 {
+  margin: 5px 0 7px;
+  color: #243b53;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.wizard-header p {
+  margin: 0;
+  color: #667085;
+  font-weight: 720;
+  line-height: 1.55;
+}
+
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0 24px 16px;
+}
+
+.wizard-steps.compact {
+  margin-top: 15px;
+  padding: 0;
+}
+
+.wizard-steps button {
+  min-height: 58px;
+  padding: 8px 5px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid #dfe8e3;
+  border-radius: 13px;
+  background: #fff;
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.wizard-steps button span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf2ef;
+  color: #667085;
+  font-weight: 950;
+}
+
+.wizard-steps button.done {
+  border-color: #a9d8c1;
+  background: #f1fbf6;
+  color: #2f6f57;
+}
+
+.wizard-steps button.done span {
+  background: #4e9f7a;
+  color: white;
+}
+
+.wizard-steps button.active {
+  border-color: #6bbf95;
+  box-shadow: 0 0 0 3px rgba(107, 191, 149, .14);
+  color: #2f6f57;
+}
+
+.wizard-content {
+  min-height: 300px;
+  overflow-y: auto;
+  margin: 0 24px;
+  padding: 24px;
+  border: 1px solid #e4e9e6;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .9);
+}
+
+.wizard-content h3 {
+  margin: 0 0 12px;
+  color: #2f6f57;
+  font-size: 23px;
+}
+
+.wizard-content p,
+.wizard-content li {
+  color: #465668;
+  font-weight: 720;
+  line-height: 1.72;
+}
+
+.wizard-content ol {
+  margin: 10px 0 18px;
+  padding-left: 1.4em;
+}
+
+.wizard-content code {
+  padding: 2px 6px;
+  border-radius: 7px;
+  background: #f1f5f3;
+  color: #2f6f57;
+}
+
+.wizard-link {
+  display: inline-flex;
+  padding: 11px 16px;
+  border-radius: 13px;
+  background: #4e9f7a;
+  color: white;
+  text-decoration: none;
+  font-weight: 900;
+}
+
+.rules-box {
+  max-height: 240px;
+  overflow: auto;
+  padding: 16px;
+  border-radius: 16px;
+  background: #17212b;
+  color: #dff3ea;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.wizard-config-textarea {
+  width: 100%;
+  min-height: 260px;
+  margin: 10px 0 14px;
+  padding: 15px;
+  border: 2px solid #dceee6;
+  border-radius: 16px;
+  background: #fbfdfc;
+  color: #243b53;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.wizard-success {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: #edf9f2;
+  color: #2f6f57;
+  border: 1px solid #bfe3cf;
+  font-weight: 850;
+}
+
+.wizard-footer {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 22px;
+}
+
+.wizard-footer span {
+  color: #667085;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+@media (max-width: 760px) {
+  .firebase-wizard-overlay {
+    align-items: start;
+    padding: 8px;
+  }
+
+  .firebase-wizard-modal {
+    width: 100%;
+    max-height: calc(100svh - 16px);
+    border-radius: 20px;
+  }
+
+  .wizard-header {
+    padding: 20px 52px 12px 15px;
+  }
+
+  .wizard-header {
+    display: block;
+  }
+
+  .wizard-header > strong {
+    display: inline-block;
+    margin-top: 8px;
+  }
+
+  .wizard-steps {
+    display: flex;
+    overflow-x: auto;
+    padding: 0 14px 12px;
+  }
+
+  .wizard-steps button {
+    flex: 0 0 92px;
+  }
+
+  .wizard-steps.compact {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .wizard-steps.compact button {
+    width: 100%;
+  }
+
+  .wizard-content {
+    margin: 0 12px;
+    padding: 17px 14px;
+  }
+
+  .wizard-footer {
+    grid-template-columns: 1fr 1fr;
+    padding: 12px;
+  }
+
+  .wizard-footer span {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .wizard-summary-row,
+  .mode-card-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wizard-summary-row .firebase-actions,
+  .mode-card-actions button {
+    width: 100%;
+  }
+}
+
+/* ✅ HUA_STORAGE_MODE_TWO_CARD_CHOICE_20260712
+   資料儲存方式改為兩張並列選擇卡；圖示與名稱同列，強化二選一與目前模式辨識。 */
+.storage-section {
+  width: 100%;
+}
+
+.storage-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.mode-card {
+  position: relative;
+  min-width: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 2px solid #e7dfd3;
+  border-radius: 22px;
+  background: #fffdf9;
+  color: #243b53;
+  box-shadow: 0 8px 22px rgba(36, 59, 83, .06);
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.mode-card.firebase-mode-card {
+  background: #f8fbff;
+  border-color: #d8e4f0;
+}
+
+.mode-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(36, 59, 83, .10);
+}
+
+.mode-card.active {
+  border-color: #4e9f7a;
+  background: #f3fbf7;
+  box-shadow: 0 0 0 4px rgba(78, 159, 122, .12), 0 12px 28px rgba(36, 59, 83, .08);
+}
+
+.mode-card.firebase-mode-card.active {
+  border-color: #5f91c3;
+  background: #f1f7fd;
+  box-shadow: 0 0 0 4px rgba(95, 145, 195, .12), 0 12px 28px rgba(36, 59, 83, .08);
+}
+
+.mode-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 42px;
+}
+
+.mode-card-title-row .mode-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: #fff3dc;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.firebase-mode-card .mode-card-title-row .mode-icon {
+  background: #e8f3ff;
+}
+
+.mode-card-title-row h4 {
+  min-width: 0;
+  margin: 0;
+  color: #2f6f57;
+  font-size: clamp(19px, 2vw, 23px);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.firebase-mode-card .mode-card-title-row h4 {
+  color: #3e6f9f;
+}
+
+.mode-selected-badge {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #dff3ea;
+  color: #2f6f57;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.firebase-mode-card .mode-selected-badge {
+  background: #dcecff;
+  color: #376b9d;
+}
+
+.mode-card > p {
+  margin: 0;
+  color: #586879;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.mode-card > ul {
+  margin: 0;
+  padding-left: 1.25em;
+  color: #465668;
+  line-height: 1.75;
+}
+
+.mode-card .risk-check,
+.mode-card .setup-state {
+  margin-top: auto;
+}
+
+.mode-card .mode-select-button {
+  width: 100%;
+}
+
+.mode-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 9px;
+}
+
+.mode-card-actions button {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 820px) {
+  .storage-mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 440px) {
+  .mode-card {
+    padding: 16px;
+  }
+
+  .mode-card-title-row {
+    gap: 8px;
+  }
+
+  .mode-card-title-row h4 {
+    font-size: 18px;
+  }
+
+  .mode-selected-badge {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+
+  .mode-card-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-card {
+    transition: none;
+  }
+}
+
+/* ✅ HUA_END_CLASS_NO_ARCHIVE_STYLE_20260712
+   移除站內封存中心；Firebase 精靈只留卡片入口；新增可選備份與安全結束班級流程。 */
+.firebase-card-tools {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  padding-top: 2px;
+}
+
+.data-text-button {
+  min-height: 0;
+  padding: 3px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #4b7196;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.data-text-button:hover {
+  background: transparent;
+  color: #2e5f8f;
+}
+
+.data-text-button.danger {
+  color: #a64a42;
+}
+
+.end-class-section {
+  border-color: #f0d8d4;
+  background: linear-gradient(145deg, #fffdfb, #fff8f6 60%, #fffdf8);
+}
+
+.end-class-section > p {
+  margin: 4px 0 14px;
+  color: #586879;
+  font-weight: 720;
+  line-height: 1.7;
+}
+
+.end-class-count {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #fff0ed;
+  color: #9b5048;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.end-class-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 14px 0 16px;
+}
+
+.end-class-list {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 15px 16px;
+  border: 1px solid #e8e4dd;
+  border-radius: 17px;
+  background: rgba(255, 255, 255, .78);
+}
+
+.end-class-list strong {
+  margin-bottom: 2px;
+  color: #34495e;
+  font-size: 16px;
+}
+
+.end-class-list span {
+  color: #596979;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.end-class-list.clear-list {
+  border-color: #f0d3cf;
+  background: #fff8f6;
+}
+
+.end-class-list.clear-list strong,
+.end-class-list.clear-list span {
+  color: #995149;
+}
+
+.end-class-list.keep-list {
+  border-color: #cfe7da;
+  background: #f5fbf8;
+}
+
+.end-class-list.keep-list strong,
+.end-class-list.keep-list span {
+  color: #326d55;
+}
+
+.end-class-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.end-class-open-button {
+  background: #b85c52;
+  color: #fff;
+}
+
+.end-class-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1700;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(40, 48, 58, .46);
+  backdrop-filter: blur(7px);
+}
+
+.end-class-modal {
+  position: relative;
+  width: min(660px, 96vw);
+  max-height: calc(100svh - 36px);
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid #ecd9d5;
+  border-radius: 27px;
+  background: linear-gradient(145deg, #ffffff, #fff9f7 62%, #fffdf8);
+  box-shadow: 0 28px 90px rgba(36, 59, 83, .28);
+}
+
+.end-class-close {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #f6f2f1;
+  color: #7c6d69;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.end-class-modal-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  border-radius: 18px;
+  background: #fff0ed;
+  font-size: 29px;
+}
+
+.end-class-modal h2 {
+  margin: 0 44px 8px 0;
+  color: #78443e;
+  font-size: clamp(24px, 4vw, 32px);
+}
+
+.end-class-modal > p {
+  margin: 0 0 18px;
+  color: #596979;
+  font-weight: 720;
+  line-height: 1.7;
+}
+
+.end-class-backup-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid #e4e8e5;
+  border-radius: 17px;
+  background: #f8fbf9;
+}
+
+.end-class-backup-box > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.end-class-backup-box strong {
+  color: #2f6f57;
+}
+
+.end-class-backup-box span {
+  color: #667085;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.end-class-acknowledge {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #f0d3cf;
+  border-radius: 16px;
+  background: #fff7f5;
+  color: #874d46;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.end-class-acknowledge input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+}
+
+.end-class-confirm-field {
+  display: grid;
+  gap: 8px;
+  color: #465668;
+  font-weight: 800;
+}
+
+.end-class-confirm-field strong {
+  color: #a44940;
+}
+
+.end-class-confirm-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e5d2ce;
+  border-radius: 14px;
+  background: #fff;
+  color: #243b53;
+  font-size: 16px;
+}
+
+.end-class-confirm-field input:focus {
+  outline: none;
+  border-color: #be756c;
+  box-shadow: 0 0 0 3px rgba(190, 117, 108, .13);
+}
+
+.end-class-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.end-class-modal-actions .data-danger {
+  background: #ad5148;
+  color: #fff;
+}
+
+.end-class-modal-actions button:disabled,
+.end-class-close:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+  transform: none;
+}
+
+@media (max-width: 760px) {
+  .firebase-card-tools {
+    justify-content: center;
+  }
+
+  .end-class-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .end-class-actions,
+  .end-class-modal-actions,
+  .end-class-backup-box {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .end-class-actions button,
+  .end-class-modal-actions button,
+  .end-class-backup-box button {
+    width: 100%;
+  }
+
+  .end-class-overlay {
+    align-items: start;
+    padding: 8px;
+  }
+
+  .end-class-modal {
+    width: 100%;
+    max-height: calc(100svh - 16px);
+    padding: 23px 16px 18px;
+    border-radius: 21px;
+  }
+
+  .end-class-count {
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+/* ✅ HUA_PERSONAL_FIREBASE_SYNC_STATUS_STYLE_20260712
+   個人 Firebase 正式同步：狀態、離線、本機待同步與資料衝突選擇。 */
+.firebase-sync-status {
+  display: grid;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid #d7e5ed;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .78);
+}
+
+.firebase-sync-status-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.firebase-sync-status-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.firebase-sync-status-head strong {
+  color: #3e6f9f;
+  font-size: 14px;
+}
+
+.firebase-sync-status-head span:not(.firebase-sync-dot) {
+  color: #5f7082;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.firebase-sync-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #8da2b4;
+  box-shadow: 0 0 0 4px rgba(141, 162, 180, .13);
+}
+
+.sync-state-synced .firebase-sync-dot {
+  background: #4e9f7a;
+  box-shadow: 0 0 0 4px rgba(78, 159, 122, .14);
+}
+
+.sync-state-connecting .firebase-sync-dot,
+.sync-state-syncing .firebase-sync-dot {
+  background: #5f91c3;
+  box-shadow: 0 0 0 4px rgba(95, 145, 195, .14);
+  animation: firebaseSyncDotPulse 1.05s ease-in-out infinite alternate;
+}
+
+.sync-state-offline .firebase-sync-dot,
+.sync-state-error .firebase-sync-dot {
+  background: #bf6b5f;
+  box-shadow: 0 0 0 4px rgba(191, 107, 95, .14);
+}
+
+.sync-state-conflict .firebase-sync-dot {
+  background: #c8992d;
+  box-shadow: 0 0 0 4px rgba(200, 153, 45, .16);
+}
+
+.sync-state-sign-in-required .firebase-sync-dot,
+.sync-state-setup-required .firebase-sync-dot {
+  background: #9a7a3c;
+  box-shadow: 0 0 0 4px rgba(154, 122, 60, .14);
+}
+
+@keyframes firebaseSyncDotPulse {
+  from { transform: scale(.86); opacity: .68; }
+  to { transform: scale(1.12); opacity: 1; }
+}
+
+.firebase-sync-meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  color: #718096;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.firebase-sync-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.firebase-sync-actions button:not(.data-text-button) {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.firebase-conflict-box {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e5c76f;
+  border-radius: 17px;
+  background: #fff9e7;
+  color: #6f5419;
+}
+
+.firebase-conflict-box > strong {
+  font-size: 15px;
+}
+
+.firebase-conflict-box > p {
+  margin: 0;
+  color: #7a632d;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.firebase-conflict-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.firebase-conflict-summary > span {
+  padding: 9px 10px;
+  border: 1px solid #ead89c;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .72);
+  color: #695521;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.firebase-conflict-summary small {
+  color: #8a7950;
+  font-size: 10px;
+}
+
+.firebase-conflict-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.firebase-conflict-actions button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 8px;
+  font-size: 11px;
+}
+
+.firebase-sync-actions button:disabled,
+.firebase-conflict-actions button:disabled,
+.mode-select-button:disabled {
+  cursor: wait;
+  opacity: .55;
+  transform: none;
+}
+
+@media (max-width: 760px) {
+  .firebase-sync-meta,
+  .firebase-sync-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .firebase-sync-actions button,
+  .firebase-conflict-actions button {
+    width: 100%;
+  }
+
+  .firebase-conflict-summary,
+  .firebase-conflict-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-state-connecting .firebase-sync-dot,
+  .sync-state-syncing .firebase-sync-dot {
+    animation: none;
+  }
+}
+
+
+/* ✅ HUA_FIREBASE_WIZARD_FEEDBACK_STYLE_20260712
+   設定精靈：錯誤直接顯示在視窗內；通知永遠位於遮罩上方。 */
+.wizard-inline-message {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border: 1px solid #e8d7a2;
+  border-radius: 14px;
+  background: #fff9e8;
+  color: #7a5a13;
+  font-weight: 850;
+  line-height: 1.55;
+}
+
+.wizard-steps button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+  box-shadow: none !important;
+}
+
+.data-center-toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1900;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 13px 17px;
+  border-radius: 16px;
+  background: #243b53;
+  color: #fff;
+  font-weight: 850;
+  line-height: 1.5;
+  box-shadow: 0 12px 34px rgba(36, 59, 83, .28);
+}
+
+.sync-state-setup-required {
+  border-color: #d9e5ee;
+  background: #f8fbfd;
+}
+
+@media (max-width: 760px) {
+  .data-center-toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    max-width: none;
+  }
+}
