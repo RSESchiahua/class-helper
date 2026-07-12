@@ -488,6 +488,15 @@ const currentMessage = computed(() => dailyMessages[dailyQuoteIndex.value])
 const currentQuote = computed(() => currentMessage.value.quote)
 const currentQuestion = computed(() => currentMessage.value.question)
 
+// ✅ HUA_HOME_QUOTE_SINGLE_LINE_20260712：桌機依句子長度自動縮放，讓完整「今日一句」盡量維持同一行。
+const homeQuoteLengthClass = computed(() => {
+  const length = Array.from(currentQuote.value || '').length
+  if (length >= 24) return 'home-quote-extra-long'
+  if (length >= 21) return 'home-quote-long'
+  if (length >= 18) return 'home-quote-medium'
+  return ''
+})
+
 function getDailyQuoteIndex(date) {
   const start = new Date(date.getFullYear(), 0, 1)
   const dayDiff = Math.floor((stripTime(date) - stripTime(start)) / (1000 * 60 * 60 * 24))
@@ -650,7 +659,7 @@ function formatToday(date) {
     <section v-if="homeDisplay.dailyQuote && !isVerticalContactLayout" class="home-hero card">
       <div class="home-hero-text">
         <span class="eyebrow">🌱 今日一句</span>
-        <h2>{{ currentQuote }}</h2>
+        <h2 :class="homeQuoteLengthClass">{{ currentQuote }}</h2>
         <p>第 {{ dailyQuoteIndex + 1 }} / 365 天｜品格 × SEL</p>
         <div v-if="homeDisplay.reflection" class="daily-reflection">
           <span>💭 今天想一想</span>
@@ -711,8 +720,11 @@ function formatToday(date) {
   border: 1px solid #f1e6d8;
 }
 
+/* ✅ HUA_HOME_HERO_FULL_WIDTH_20260712：今日一句內容填滿卡片寬度，不再在右側留下像缺漏的空白。 */
 .home-hero-text {
-  max-width: 920px;
+  width: 100%;
+  max-width: none;
+  flex: 1 1 auto;
 }
 
 .eyebrow {
@@ -802,6 +814,30 @@ function formatToday(date) {
 
 .soft-link {
   background: #6bbf95;
+}
+
+
+/* ✅ HUA_HOME_QUOTE_SINGLE_LINE_STYLE_20260712
+   桌機依句長微調字級，25 字以內的 365 句今日一句盡量完整排在同一行。 */
+@media (min-width: 901px) {
+  .home-hero h2 {
+    white-space: nowrap;
+  }
+
+  .home-hero h2.home-quote-medium {
+    font-size: clamp(30px, 3.35vw, 42px);
+    letter-spacing: .01em;
+  }
+
+  .home-hero h2.home-quote-long {
+    font-size: clamp(28px, 3.05vw, 39px);
+    letter-spacing: 0;
+  }
+
+  .home-hero h2.home-quote-extra-long {
+    font-size: clamp(26px, 2.7vw, 35px);
+    letter-spacing: 0;
+  }
 }
 
 @media (max-width: 980px) {
