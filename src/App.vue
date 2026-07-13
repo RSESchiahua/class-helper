@@ -3,7 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CLOUD_DATA_UPDATED_EVENT,
-  chooseLocalStorageMode
+  chooseLocalStorageMode,
+  cloudState,
+  downloadFullBackup,
+  resolveSyncConflict
 } from './services/cloudSync'
 import { STORAGE_MODE_KEY, setStorageMode } from './services/dataCenter'
 
@@ -97,6 +100,18 @@ const sidebarOrder = ref(loadSidebarOrder())
 const classAffairsOpen = ref(loadClassAffairsOpen())
 const draggedKey = ref('')
 const dataRefreshKey = ref(0)
+
+// ✅ HUA_GLOBAL_SYNC_CONFLICT_MODAL_20260713：同步衝突改為全站視窗，不論停在哪一頁都能先備份再選擇資料版本。
+const globalConflictBusy = ref(false)
+const globalConflictMessage = ref('')
+const globalConflictCloudTime = computed(() => {
+  if (!cloudState.conflictCloudUpdatedAt) return '時間不明'
+  const date = new Date(cloudState.conflictCloudUpdatedAt)
+  return Number.isNaN(date.getTime())
+    ? '時間不明'
+    : date.toLocaleString('zh-TW', { hour12: false })
+})
+
 let logoClickCount = 0
 let logoTimer = null
 
@@ -180,6 +195,35 @@ function handleNavDrop(event, targetKey) {
 
 function handleCloudDataUpdated() {
   dataRefreshKey.value += 1
+}
+
+function handleGlobalConflictBackup() {
+  try {
+    downloadFullBackup()
+    globalConflictMessage.value = '完整備份已下載。現在可以安心選擇要保留的資料版本。'
+  } catch (error) {
+    globalConflictMessage.value = error?.message || '備份下載失敗，請稍後再試。'
+  }
+}
+
+async function chooseGlobalConflictVersion(strategy) {
+  if (globalConflictBusy.value) return
+  globalConflictBusy.value = true
+  globalConflictMessage.value = ''
+  try {
+    const resolved = await resolveSyncConflict(strategy)
+    if (!resolved) {
+      globalConflictMessage.value = '尚未完成資料選擇，請再試一次。'
+      return
+    }
+    globalConflictMessage.value = strategy === 'cloud'
+      ? '已採用雲端資料。'
+      : '已用這台裝置的資料更新雲端。'
+  } catch (error) {
+    globalConflictMessage.value = error?.message || '無法處理資料衝突，請稍後再試。'
+  } finally {
+    globalConflictBusy.value = false
+  }
 }
 
 onMounted(() => {
@@ -278,6 +322,65 @@ function resetSidebarOrder() {
     <main class="main-content">
       <RouterView :key="dataRefreshKey" />
     </main>
+
+    <div
+      v-if="cloudState.conflictPending"
+      class="storage-choice-overlay global-sync-conflict-overlay"
+    >
+      <section
+        class="storage-choice-modal conflict-modal global-sync-conflict-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="global-sync-conflict-title"
+        aria-describedby="global-sync-conflict-description"
+      >
+        <div class="storage-choice-heading global-sync-conflict-heading">
+          <span aria-hidden="true">⚠️</span>
+          <div>
+            <h2 id="global-sync-conflict-title">本機與雲端資料不同</h2>
+            <p id="global-sync-conflict-description">系統已暫停自動覆蓋。請先下載完整備份，再選擇這次要保留哪一份資料。</p>
+          </div>
+        </div>
+
+        <div class="conflict-summary">
+          <span>💻 這台裝置<br><strong>{{ cloudState.conflictLocalCount }} 組資料</strong></span>
+          <span>☁️ 雲端資料<br><strong>{{ cloudState.conflictCloudCount }} 組資料</strong><br><small>{{ globalConflictCloudTime }}</small></span>
+        </div>
+
+        <p v-if="globalConflictMessage" class="global-sync-conflict-message">{{ globalConflictMessage }}</p>
+
+        <div class="conflict-actions">
+          <button
+            type="button"
+            class="cloud-soft-action conflict-backup-button"
+            :disabled="globalConflictBusy"
+            @click="handleGlobalConflictBackup"
+          >
+            ⬇️ 先下載完整備份
+          </button>
+          <button
+            type="button"
+            class="cloud-soft-action"
+            :disabled="globalConflictBusy"
+            @click="chooseGlobalConflictVersion('cloud')"
+          >
+            ☁️ 使用雲端資料
+          </button>
+          <button
+            type="button"
+            class="cloud-primary-action"
+            :disabled="globalConflictBusy"
+            @click="chooseGlobalConflictVersion('local')"
+          >
+            💻 保留這台裝置資料
+          </button>
+        </div>
+
+        <p class="storage-choice-note warning-note global-sync-conflict-note">
+          選擇「使用雲端資料」會以雲端內容取代這台裝置目前的班級資料；選擇「保留這台裝置資料」則會把這台裝置的內容上傳到雲端。
+        </p>
+      </section>
+    </div>
 
     <div v-if="storageChoiceOpen" class="storage-choice-overlay first-run-storage-choice">
       <section class="storage-choice-modal" role="dialog" aria-modal="true" aria-labelledby="first-run-storage-title" aria-describedby="first-run-storage-description">

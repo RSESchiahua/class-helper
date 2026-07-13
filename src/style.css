@@ -3864,3 +3864,98 @@ input[type="time"] {
     padding: 13px;
   }
 }
+
+
+/* ✅ HUA_GLOBAL_SYNC_CONFLICT_MODAL_STYLE_20260713
+   Firebase 衝突改成全站阻擋式視窗：任何頁面都能看見，先備份後再選擇本機或雲端。 */
+.global-sync-conflict-overlay {
+  z-index: 2100;
+  background: rgba(36, 59, 83, .46);
+}
+
+.global-sync-conflict-modal {
+  width: min(680px, 96vw);
+  border-color: #ead18a;
+  background: linear-gradient(145deg, #ffffff, #fffaf0 58%, #f5fbf8);
+}
+
+.global-sync-conflict-heading h2 {
+  color: #765816;
+}
+
+.global-sync-conflict-heading > span {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: #fff0bd;
+  font-size: 28px;
+}
+
+.global-sync-conflict-modal .conflict-summary span {
+  display: grid;
+  gap: 4px;
+  line-height: 1.45;
+}
+
+.global-sync-conflict-modal .conflict-summary strong {
+  color: #2f6f57;
+  font-size: 18px;
+}
+
+.global-sync-conflict-modal .conflict-summary small {
+  color: #7a8794;
+  font-size: 11px;
+}
+
+.global-sync-conflict-message {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border: 1px solid #cfe7da;
+  border-radius: 14px;
+  background: #f1faf5;
+  color: #2f6f57;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.global-sync-conflict-note {
+  margin-top: 15px;
+}
+
+.global-sync-conflict-modal button:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+@media (max-width: 760px) {
+  .global-sync-conflict-overlay {
+    align-items: start;
+    padding: 10px;
+  }
+
+  .global-sync-conflict-modal {
+    width: 100%;
+    max-height: calc(100svh - 20px);
+    padding: 22px 15px 18px;
+    border-radius: 22px;
+  }
+
+  .global-sync-conflict-heading > span {
+    width: 40px;
+    height: 40px;
+    font-size: 23px;
+  }
+
+  .global-sync-conflict-modal .conflict-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .global-sync-conflict-modal .conflict-backup-button {
+    grid-column: 1;
+    width: 100%;
+  }
+}

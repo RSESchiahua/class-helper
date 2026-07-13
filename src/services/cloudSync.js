@@ -1,6 +1,7 @@
 // ✅ HUA_PERSONAL_FIREBASE_REAL_SYNC_20260712：本機優先、個人 Firebase 即時同步、版本衝突保護與跨裝置更新。
 // ✅ HUA_CLOUD_IDENTITY_SWITCH_PROTECTION_20260712：切換 Firebase 專案或 Google 帳號時不再自動上傳本機班級資料，必須由老師明確選擇。
 // ✅ HUA_APP_CHECK_SYNC_ERROR_GUIDANCE_20260712：App Check 權杖或強制狀態異常時，顯示可理解的修正提示。
+// ✅ HUA_APP_CHECK_CONFIG_RECONNECT_FIX_20260713：App Check 或 Firebase 設定儲存後立即重建同步連線，避免舊連線搭配已清除版本資訊而停止寫入。
 import { reactive, readonly } from 'vue'
 import { get, onValue, ref, runTransaction } from 'firebase/database'
 import {
@@ -8,6 +9,7 @@ import {
   getClassDataSummaryFromObject,
   getLastCloudIdentity,
   getPersonalFirebaseConfig,
+  PERSONAL_FIREBASE_CONFIG_CHANGED_EVENT,
   getStorageMode,
   hasMeaningfulClassData,
   isClassDataKey,
@@ -317,6 +319,30 @@ function handleOffline() {
   })
 }
 
+function handlePersonalFirebaseConfigChanged(event) {
+  if (getStorageMode() !== 'firebase') return
+
+  const changedProject = Boolean(event?.detail?.changedProject)
+  const changedAppCheck = Boolean(event?.detail?.changedAppCheck)
+  if (!changedProject && !changedAppCheck) return
+
+  // 先解除舊 Database 監聽與待寫入計時器，再使用最新設定重新建立 App Check、Auth 與 Database。
+  resetConnection()
+  setState({
+    status: navigator.onLine ? 'connecting' : 'offline',
+    message: navigator.onLine
+      ? 'Firebase 安全設定已更新，正在重新連線…'
+      : 'Firebase 安全設定已更新；恢復網路後會重新連線',
+    syncMode: 'firebase',
+    localOnly: false,
+    permissionDenied: false,
+    pendingChanges: false,
+    isOnline: navigator.onLine
+  })
+
+  if (navigator.onLine) void connectCloud({ interactive: false })
+}
+
 export function installLocalStorageObserver() {
   if (observerInstalled) return
   observerInstalled = true
@@ -327,6 +353,7 @@ export function installLocalStorageObserver() {
   }
   lastObservedHash = hashClassData()
   window.addEventListener(LOCAL_STORAGE_MUTATION_EVENT, handleLocalStorageMutation)
+  window.addEventListener(PERSONAL_FIREBASE_CONFIG_CHANGED_EVENT, handlePersonalFirebaseConfigChanged)
   window.addEventListener('storage', handleStorageEvent)
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)

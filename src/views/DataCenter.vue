@@ -1,4 +1,5 @@
 <script setup>
+// ✅ HUA_GLOBAL_SYNC_CONFLICT_FALLBACK_20260713：資料中心保留內嵌衝突工具，並由 App.vue 提供全站選擇視窗。
 // ✅ HUA_FIRST_RUN_FIREBASE_WIZARD_AUTO_OPEN_20260712：首次選擇個人 Firebase 後直接開啟設定精靈。
 // ✅ HUA_SAFARI_FIREBASE_POPUP_FEEDBACK_20260712：登入按下後立即顯示狀態，並清楚回報 Safari 彈窗阻擋。
 // ✅ HUA_FIREBASE_SETUP_SMOOTH_FLOW_20260712：整段 Config 可直接貼、已登入不重複跳窗、成功後清楚引導同步驗收。
@@ -544,7 +545,7 @@ async function chooseConflictVersion(strategy) {
                 <span>雲端：{{ cloudState.conflictCloudCount }} 組資料<br><small>{{ conflictCloudTime }}</small></span>
               </div>
               <div class="firebase-conflict-actions">
-                <button type="button" class="data-secondary" @click="handleExport">先下載本機備份</button>
+                <button type="button" class="data-secondary" @click="handleExport">先下載完整備份</button>
                 <button type="button" class="data-secondary" :disabled="syncBusy" @click="chooseConflictVersion('cloud')">使用雲端資料</button>
                 <button type="button" class="data-primary" :disabled="syncBusy" @click="chooseConflictVersion('local')">使用這台裝置</button>
               </div>

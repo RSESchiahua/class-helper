@@ -2,6 +2,7 @@
 // ✅ HUA_FIREBASE_CONFIG_FULL_SNIPPET_PARSER_20260712：可直接貼上 Firebase 完整 SDK 程式碼，自動找出 firebaseConfig。
 // ✅ HUA_APP_CHECK_PERSONAL_SITE_KEY_STORAGE_20260712：每位老師可在自己的裝置保存自己的 App Check Site Key，不集中代管、不納入班級備份。
 // ✅ HUA_FIREBASE_ACCOUNT_BOUNDARY_GUARD_20260712：記住上一個雲端身分，避免同一裝置切換帳號時誤把班級資料上傳到別人的 Firebase。
+// ✅ HUA_APP_CHECK_CONFIG_META_PRESERVE_FIX_20260713：只變更 App Check Site Key 時保留既有同步版本資訊，並通知同步服務安全重新連線。
 export const STORAGE_MODE_KEY = 'classHelperStorageModeV3'
 export const CLASS_PROFILE_KEY = 'classHelperClassProfileV1'
 export const LEGACY_CLASS_ARCHIVES_KEY = 'classHelperClassArchivesV1'
@@ -10,6 +11,7 @@ export const FIREBASE_WIZARD_KEY = 'classHelperFirebaseWizardV1'
 export const FIREBASE_TEST_KEY = 'classHelperFirebaseTestV1'
 export const LOCAL_RISK_ACK_KEY = 'classHelperLocalRiskAcknowledgedV1'
 export const LAST_CLOUD_IDENTITY_KEY = 'classHelperLastCloudIdentityV1'
+export const PERSONAL_FIREBASE_CONFIG_CHANGED_EVENT = 'class-helper-personal-firebase-config-changed'
 
 const MAX_BACKUP_FILE_BYTES = 8 * 1024 * 1024
 
@@ -552,15 +554,30 @@ export function savePersonalFirebaseConfig(configOrText, options = {}) {
     previous.appId !== clean.appId ||
     previous.databaseURL !== clean.databaseURL
   )
-  const changedAppCheck = previous && String(previous.appCheckSiteKey || '') !== String(clean.appCheckSiteKey || '')
-  if (changedProject || changedAppCheck) {
+  const changedAppCheck = Boolean(
+    previous && String(previous.appCheckSiteKey || '') !== String(clean.appCheckSiteKey || '')
+  )
+
+  // 只有 Firebase 專案／App／Database 身分真的改變時，才清除雲端版本資訊。
+  // App Check Site Key 只影響請求驗證方式，不代表換了一份雲端資料；若在此清除
+  // classHelperCloudSyncMetaV1，既有連線下一次寫入會誤判成未知版本衝突而停止同步。
+  if (changedProject) {
     localStorage.removeItem(FIREBASE_TEST_KEY)
     localStorage.removeItem('classHelperCloudSyncMetaV1')
     localStorage.removeItem('classHelperCloudForceUploadPendingV1')
     // LAST_CLOUD_IDENTITY_KEY 刻意保留：下次登入時用來阻止跨帳號資料誤上傳。
+  } else if (changedAppCheck) {
+    localStorage.removeItem(FIREBASE_TEST_KEY)
   }
 
   localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(clean))
+
+  if (previous && (changedProject || changedAppCheck) && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(PERSONAL_FIREBASE_CONFIG_CHANGED_EVENT, {
+      detail: { changedProject: Boolean(changedProject), changedAppCheck }
+    }))
+  }
+
   return clean
 }
 
